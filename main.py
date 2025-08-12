@@ -198,11 +198,23 @@ def main():
         save_json_file(analysis_report, analysis_report_path)
         logger.info(f"Analysis report saved to: {analysis_report_path}")
 
-        # Step 6: Get conversion order
+        # Step 6: Get conversion order and filter out non-existent functions
         conversion_order = analysis_report.get('conversion_order', [])
         if not conversion_order:
             # If no conversion_order, extract function names from function_analysis
             conversion_order = [func['function_name'] for func in analysis_report.get('function_analysis', [])]
+
+        # Filter out functions that don't actually exist in the script
+        # (e.g., imported functions like validate_data_quality)
+        available_functions = []
+        for function_name in conversion_order:
+            try:
+                extract_function_code(script_content, function_name)
+                available_functions.append(function_name)
+            except Exception:
+                logger.warning(f"Function '{function_name}' not found in script, skipping...")
+
+        conversion_order = available_functions
 
         logger.info(f"Functions to process: {conversion_order}")
 
@@ -224,8 +236,8 @@ def main():
                     function_analysis = func_data
                     break
 
-            # Call enricher
-            enrichment_result = enricher.enrich_function(function_code, function_analysis)
+            # Call enricher (only needs function_code)
+            enrichment_result = enricher.enrich_function(function_code)
 
             # Store results
             enriched_functions[function_name] = enrichment_result.get('enriched_code', function_code)
@@ -249,10 +261,12 @@ def main():
                     break
 
             # Call migrator
-            migrated_code = migrator.migrate_function(enriched_code, function_analysis)
+            migrated_code = migrator.migrate_function(enriched_code, function_analysis, knowledge_service)
 
             # Call reviewer
-            review_result = reviewer.review_and_correct_migration(migrated_code, function_analysis)
+            review_result = reviewer.review_and_correct_migration(
+                enriched_code, migrated_code, knowledge_service, function_analysis
+            )
             corrected_code = review_result.get('corrected_code', migrated_code)
 
             # Collect results
@@ -278,13 +292,16 @@ def main():
                 # Call migrator for test code (assuming migrator has test handling method)
                 try:
                     migrated_test = migrator.migrate_function(test_code, function_analysis)
-                    review_result = reviewer.review_and_correct_migration(migrated_test, function_analysis)
+                    review_result = reviewer.review_and_correct_migration(
+                        test_code, migrated_test, knowledge_service, function_analysis
+                    )
                     corrected_test = review_result.get('corrected_code', migrated_test)
                     final_test_migrations.append(corrected_test)
                 except Exception as e:
                     logger.warning(f"Error migrating test for {function_name}: {str(e)}")
                     # If test migration fails, use original test code
                     final_test_migrations.append(test_code)
+
 
         # Step 10: Merge and save final files
         logger.info("=== Phase 4: Merging and Saving Final Files ===")
@@ -312,7 +329,6 @@ def main():
     except Exception as e:
         logger.error(f"Migration failed: {str(e)}")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
