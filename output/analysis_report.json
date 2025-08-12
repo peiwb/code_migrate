@@ -1,0 +1,205 @@
+{
+    "source_file_name": "sample_spark_script.py",
+    "analysis_timestamp": "2025-08-12T05:29:45.142342",
+    "package_analysis": {
+        "standard_libs": [
+            {
+                "import_statement": "import os",
+                "purpose": "Operating system interface for environment variables and file system operations"
+            },
+            {
+                "import_statement": "import sys",
+                "purpose": "System-specific parameters and functions"
+            },
+            {
+                "import_statement": "from datetime import datetime, timedelta",
+                "purpose": "Date and time manipulation utilities"
+            },
+            {
+                "import_statement": "from typing import List, Dict, Any",
+                "purpose": "Type hints for better code documentation and IDE support"
+            }
+        ],
+        "third_party": [
+            {
+                "import_statement": "from pyspark.sql import SparkSession, DataFrame",
+                "purpose": "Core PySpark SQL functionality for distributed data processing"
+            },
+            {
+                "import_statement": "from pyspark.sql.functions import col, lit, when, sum as spark_sum, count, avg",
+                "purpose": "PySpark SQL functions for data transformation and aggregation operations"
+            },
+            {
+                "import_statement": "from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType",
+                "purpose": "PySpark data types for defining DataFrame schemas"
+            }
+        ],
+        "custom_modules": [
+            {
+                "import_statement": "from utils.data_validator import validate_data_quality",
+                "purpose": "Custom data validation functionality for quality checks"
+            },
+            {
+                "import_statement": "from config.spark_config import get_spark_config",
+                "purpose": "Custom Spark configuration settings"
+            }
+        ]
+    },
+    "function_analysis": [
+        {
+            "function_name": "create_spark_session",
+            "dependencies": {
+                "internal_functions": [],
+                "external_packages": [
+                    "pyspark.sql.SparkSession"
+                ]
+            },
+            "suggested_patterns": [
+                "pyspark.SparkSession.builder",
+                "pyspark.config"
+            ]
+        },
+        {
+            "function_name": "load_customer_data",
+            "dependencies": {
+                "internal_functions": [],
+                "external_packages": [
+                    "pyspark.sql.SparkSession",
+                    "pyspark.sql.DataFrame",
+                    "pyspark.sql.types.StructType",
+                    "pyspark.sql.types.StructField",
+                    "pyspark.sql.types.StringType",
+                    "pyspark.sql.types.IntegerType",
+                    "pyspark.sql.types.DoubleType"
+                ]
+            },
+            "suggested_patterns": [
+                "pyspark.schema.definition",
+                "pyspark.dataReader.csv",
+                "pyspark.dataReader.option",
+                "pyspark.dataReader.schema"
+            ]
+        },
+        {
+            "function_name": "load_transaction_data",
+            "dependencies": {
+                "internal_functions": [],
+                "external_packages": [
+                    "pyspark.sql.SparkSession",
+                    "pyspark.sql.DataFrame"
+                ]
+            },
+            "suggested_patterns": [
+                "pyspark.read",
+                "pyspark.option",
+                "pyspark.json"
+            ]
+        },
+        {
+            "function_name": "clean_customer_data",
+            "dependencies": {
+                "internal_functions": [
+                    "validate_data_quality"
+                ],
+                "external_packages": [
+                    "pyspark.sql.functions.col",
+                    "pyspark.sql.functions.when"
+                ]
+            },
+            "suggested_patterns": [
+                "pyspark.dropDuplicates",
+                "pyspark.filter",
+                "pyspark.withColumn",
+                "pyspark.when.otherwise"
+            ]
+        },
+        {
+            "function_name": "enrich_customer_data",
+            "dependencies": {
+                "internal_functions": [],
+                "external_packages": [
+                    "pyspark.sql.functions.count",
+                    "pyspark.sql.functions.sum",
+                    "pyspark.sql.functions.avg",
+                    "pyspark.sql.functions.when",
+                    "pyspark.sql.functions.col"
+                ]
+            },
+            "suggested_patterns": [
+                "pyspark.groupBy",
+                "pyspark.agg",
+                "pyspark.join",
+                "pyspark.withColumn",
+                "pyspark.when",
+                "pyspark.otherwise"
+            ]
+        },
+        {
+            "function_name": "generate_customer_insights",
+            "dependencies": {
+                "internal_functions": [],
+                "external_packages": [
+                    "pyspark.sql.functions.count",
+                    "pyspark.sql.functions.avg",
+                    "pyspark.sql.functions.sum"
+                ]
+            },
+            "suggested_patterns": [
+                "pyspark.groupBy",
+                "pyspark.agg",
+                "pyspark.orderBy",
+                "pyspark.alias"
+            ]
+        },
+        {
+            "function_name": "save_results",
+            "dependencies": {
+                "internal_functions": [],
+                "external_packages": [
+                    "pyspark.sql.DataFrame"
+                ]
+            },
+            "suggested_patterns": [
+                "pyspark.coalesce",
+                "pyspark.write",
+                "pyspark.mode",
+                "pyspark.option",
+                "pyspark.parquet",
+                "pyspark.csv",
+                "pyspark.json"
+            ]
+        },
+        {
+            "function_name": "main",
+            "dependencies": {
+                "internal_functions": [
+                    "create_spark_session",
+                    "load_customer_data",
+                    "load_transaction_data",
+                    "clean_customer_data",
+                    "enrich_customer_data",
+                    "generate_customer_insights",
+                    "save_results"
+                ],
+                "external_packages": []
+            },
+            "suggested_patterns": [
+                "pyspark.SparkSession",
+                "pyspark.DataFrame.show",
+                "pyspark.DataFrame.count",
+                "pyspark.SparkSession.stop"
+            ]
+        }
+    ],
+    "conversion_order": [
+        "create_spark_session",
+        "load_customer_data",
+        "load_transaction_data",
+        "validate_data_quality",
+        "clean_customer_data",
+        "enrich_customer_data",
+        "generate_customer_insights",
+        "save_results",
+        "main"
+    ]
+}
