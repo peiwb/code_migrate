@@ -1,0 +1,1114 @@
+[
+  {
+    "id": "snowpark.session.table",
+    "description": "Creates a DataFrame from a table or view in Snowflake.",
+    "usage_context": "This is the most fundamental and direct way to load an existing table as a DataFrame from a Snowflake database. It's suitable for scenarios where the data already resides in Snowflake.",
+    "required_imports": [],
+    "code_snippet": "df = session.table(\"${table_name}\")",
+    "placeholders": [
+      {
+        "name": "table_name",
+        "type": "string",
+        "description": "The name of the Snowflake table or view to load. Can be a fully qualified name (e.g., 'db.schema.table') or a partial name."
+      }
+    ],
+    "return_value": {
+      "type": "Snowpark DataFrame",
+      "description": "A Snowpark DataFrame object representing the data in the table."
+    }
+  },
+  {
+    "id": "snowpark.session.sql",
+    "description": "Executes a SQL query and returns the result as a DataFrame.",
+    "usage_context": "A powerful feature for when data processing logic is simpler to express in SQL than with the DataFrame API. Ideal for complex JOINs, aggregations, or using Snowflake-specific SQL functions.",
+    "required_imports": [],
+    "code_snippet": "df = session.sql(\"${sql_query}\")",
+    "placeholders": [
+      {
+        "name": "sql_query",
+        "type": "string",
+        "description": "The complete SQL query string to execute."
+      }
+    ],
+    "return_value": {
+      "type": "Snowpark DataFrame",
+      "description": "A Snowpark DataFrame object containing the result set of the SQL query."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.action.collect",
+    "description": "Triggers computation and returns all result data as a list of Row objects to the client's memory.",
+    "usage_context": "Mainly used for fetching small-scale final results for further processing in the Python client, debugging, or integration with libraries that don't support Snowpark. WARNING: Using this on large datasets will cause client-side memory errors and should be avoided.",
+    "required_imports": [],
+    "code_snippet": "results_list = ${dataframe_variable}.collect()",
+    "placeholders": [
+      {
+        "name": "dataframe_variable",
+        "type": "Snowpark DataFrame",
+        "description": "The DataFrame instance to execute and collect results from."
+      }
+    ],
+    "return_value": {
+      "type": "list[snowflake.snowpark.Row]",
+      "description": "A Python list where each element is a snowflake.snowpark.Row object."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.action.show",
+    "description": "Prints the first N rows of the DataFrame to the console for debugging and quick previews.",
+    "usage_context": "An ideal tool for quickly inspecting the schema and a sample of the data at various stages of a transformation pipeline to verify logic. It does not pull the entire dataset into memory, making it safer than .collect().",
+    "required_imports": [],
+    "code_snippet": "${dataframe_variable}.show(n=${n}, max_width=${max_width})",
+    "placeholders": [
+      {
+        "name": "dataframe_variable",
+        "type": "Snowpark DataFrame",
+        "description": "The DataFrame instance to preview."
+      },
+      {
+        "name": "n",
+        "type": "int",
+        "description": "The number of rows to display. Defaults to 10."
+      },
+      {
+        "name": "max_width",
+        "type": "int",
+        "description": "The maximum character width for displaying each column. Defaults to 80."
+      }
+    ],
+    "return_value": {
+      "type": "None",
+      "description": "This method prints directly to the console and has no return value."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.action.count",
+    "description": "Triggers a computation and returns the total number of rows in the DataFrame.",
+    "usage_context": "Used to get the size of a DataFrame, often for data validation, flow control, or logging. This is an action and will trigger a full computation job.",
+    "required_imports": [],
+    "code_snippet": "total_rows = ${dataframe_variable}.count()",
+    "placeholders": [
+      {
+        "name": "dataframe_variable",
+        "type": "Snowpark DataFrame",
+        "description": "The DataFrame instance to count the rows of."
+      }
+    ],
+    "return_value": {
+      "type": "int",
+      "description": "The total number of rows in the DataFrame."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.create_or_replace_temp_view",
+    "description": "Registers a DataFrame as a temporary view, allowing it to be referenced directly in subsequent SQL queries.",
+    "usage_context": "Very useful when you've built a complex transformation flow with the DataFrame API but wish to query this intermediate result using session.sql(). The view's lifecycle is tied to the Session.",
+    "required_imports": [],
+    "code_snippet": "${dataframe_variable}.create_or_replace_temp_view(\"${view_name}\")",
+    "placeholders": [
+      {
+        "name": "dataframe_variable",
+        "type": "Snowpark DataFrame",
+        "description": "The DataFrame instance to register as a view."
+      },
+      {
+        "name": "view_name",
+        "type": "string",
+        "description": "The name of the temporary view to create."
+      }
+    ],
+    "return_value": {
+      "type": "None",
+      "description": "This method has no return value."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.transform.select",
+    "description": "Selects, renames, or calculates new columns based on expressions.",
+    "usage_context": "A core step for building data transformations. It can be used to reduce the number of columns, rename columns (using .alias()), or create derived columns using functions from snowflake.snowpark.functions.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "new_df = ${dataframe_variable}.select(${columns_or_expressions})",
+    "placeholders": [
+      {
+        "name": "dataframe_variable",
+        "type": "Snowpark DataFrame",
+        "description": "The source DataFrame instance."
+      },
+      {
+        "name": "columns_or_expressions",
+        "type": "string | Column | list",
+        "description": "One or more column name strings or column expressions. E.g.: 'col_a', F.col('col_b').alias('new_name'), (F.col('c') + 1)."
+      }
+    ],
+    "return_value": {
+      "type": "Snowpark DataFrame",
+      "description": "A new DataFrame containing only the selected columns."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.transform.filter",
+    "description": "Filters rows based on a specified condition. Alias for where().",
+    "usage_context": "One of the most common operations for data cleaning and subset extraction. The condition can be a SQL expression string or a complex logic built using Column objects and functions.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "filtered_df = ${dataframe_variable}.filter(${condition_expression})",
+    "placeholders": [
+      {
+        "name": "dataframe_variable",
+        "type": "Snowpark DataFrame",
+        "description": "The source DataFrame instance."
+      },
+      {
+        "name": "condition_expression",
+        "type": "string | Column",
+        "description": "A boolean column expression for filtering. E.g.: F.col('sales') > 1000 or \"sales > 1000\"."
+      }
+    ],
+    "return_value": {
+      "type": "Snowpark DataFrame",
+      "description": "A new DataFrame containing only the rows that satisfy the condition."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.transform.with_column",
+    "description": "Adds a new column or replaces an existing column of the same name.",
+    "usage_context": "A key operation for feature engineering and data enrichment, equivalent to PySpark's withColumn. Used to create new information based on existing columns.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "new_df = ${dataframe_variable}.with_column(\"${new_column_name}\", ${column_expression})",
+    "placeholders": [
+      {
+        "name": "dataframe_variable",
+        "type": "Snowpark DataFrame",
+        "description": "The source DataFrame instance."
+      },
+      {
+        "name": "new_column_name",
+        "type": "string",
+        "description": "The name of the column to add or replace."
+      },
+      {
+        "name": "column_expression",
+        "type": "Column",
+        "description": "A Column object expression used to compute the new column's values."
+      }
+    ],
+    "return_value": {
+      "type": "Snowpark DataFrame",
+      "description": "A DataFrame with the new or updated column."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.transform.drop",
+    "description": "Drops one or more specified columns.",
+    "usage_context": "Used at the end of a data processing pipeline to remove intermediate columns or sensitive information, cleaning up the final output.",
+    "required_imports": [],
+    "code_snippet": "new_df = ${dataframe_variable}.drop(${columns_to_drop})",
+    "placeholders": [
+      {
+        "name": "dataframe_variable",
+        "type": "Snowpark DataFrame",
+        "description": "The source DataFrame instance."
+      },
+      {
+        "name": "columns_to_drop",
+        "type": "string | list[string]",
+        "description": "The name or list of names of the columns to drop."
+      }
+    ],
+    "return_value": {
+      "type": "Snowpark DataFrame",
+      "description": "A new DataFrame without the dropped columns."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.transform.join",
+    "description": "Joins two DataFrames based on specified columns and join type.",
+    "usage_context": "Used to combine information from different data sources, a core operation for data integration. Supports various join types like 'inner', 'left', 'right', 'full', 'cross', 'semi', 'anti'.",
+    "required_imports": [],
+    "code_snippet": "joined_df = ${left_dataframe}.join(${right_dataframe}, on=${join_columns}, how=\"${how}\")",
+    "placeholders": [
+      {
+        "name": "left_dataframe",
+        "type": "Snowpark DataFrame",
+        "description": "The left DataFrame in the join operation."
+      },
+      {
+        "name": "right_dataframe",
+        "type": "Snowpark DataFrame",
+        "description": "The right DataFrame in the join operation."
+      },
+      {
+        "name": "join_columns",
+        "type": "string | list[string] | Column",
+        "description": "The column names or join condition expression to join on."
+      },
+      {
+        "name": "how",
+        "type": "string",
+        "description": "The type of join, e.g., 'inner', 'left', 'right', 'outer', 'leftouter', 'cross', 'semi', 'anti'."
+      }
+    ],
+    "return_value": {
+      "type": "Snowpark DataFrame",
+      "description": "A new DataFrame containing the result of joining the two DataFrames."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.transform.union",
+    "description": "Combines two DataFrames with the same structure and removes duplicate rows.",
+    "usage_context": "Used to vertically stack data from multiple sources while ensuring the final dataset contains only unique rows. If you don't need deduplication, use union_all() for better performance.",
+    "required_imports": [],
+    "code_snippet": "combined_df = ${dataframe1}.union(${dataframe2})",
+    "placeholders": [
+      {
+        "name": "dataframe1",
+        "type": "Snowpark DataFrame",
+        "description": "The first DataFrame to combine."
+      },
+      {
+        "name": "dataframe2",
+        "type": "Snowpark DataFrame",
+        "description": "The second DataFrame to combine, which must have the same schema as the first."
+      }
+    ],
+    "return_value": {
+      "type": "Snowpark DataFrame",
+      "description": "A new DataFrame containing all rows from both DataFrames, with duplicates removed."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.transform.union_all",
+    "description": "Combines two DataFrames with the same structure without removing duplicates.",
+    "usage_context": "Used to vertically stack data from multiple sources, such as files from different time periods. union_all() is generally more performant than union() as it avoids the deduplication step.",
+    "required_imports": [],
+    "code_snippet": "combined_df = ${dataframe1}.union_all(${dataframe2})",
+    "placeholders": [
+      {
+        "name": "dataframe1",
+        "type": "Snowpark DataFrame",
+        "description": "The first DataFrame to combine."
+      },
+      {
+        "name": "dataframe2",
+        "type": "Snowpark DataFrame",
+        "description": "The second DataFrame to combine, which must have the same schema as the first."
+      }
+    ],
+    "return_value": {
+      "type": "Snowpark DataFrame",
+      "description": "A new DataFrame containing all rows from both DataFrames."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.transform.sort",
+    "description": "Sorts a DataFrame by one or more columns. Alias for order_by().",
+    "usage_context": "Used to order data in a specific sequence before writing or displaying it. You can specify ascending or descending order using F.asc() and F.desc().",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "sorted_df = ${dataframe_variable}.sort(${sort_columns})",
+    "placeholders": [
+      {
+        "name": "dataframe_variable",
+        "type": "Snowpark DataFrame",
+        "description": "The source DataFrame instance."
+      },
+      {
+        "name": "sort_columns",
+        "type": "string | Column | list",
+        "description": "One or more columns to sort by. E.g.: 'col_a', F.col('col_b').desc()"
+      }
+    ],
+    "return_value": {
+      "type": "Snowpark DataFrame",
+      "description": "A new DataFrame sorted according to the specified order."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.transform.group_by",
+    "description": "Groups the data based on one or more columns, typically followed by .agg() to perform aggregations.",
+    "usage_context": "A core step for data analysis and reporting, used to calculate summary statistics by category (e.g., department, region, user). Must be used in conjunction with .agg().",
+    "required_imports": [],
+    "code_snippet": "grouped_df = ${dataframe_variable}.group_by(${grouping_columns})",
+    "placeholders": [
+      {
+        "name": "dataframe_variable",
+        "type": "Snowpark DataFrame",
+        "description": "The source DataFrame instance."
+      },
+      {
+        "name": "grouping_columns",
+        "type": "string | Column | list",
+        "description": "The column name(s) or expression(s) to group by."
+      }
+    ],
+    "return_value": {
+      "type": "RelationalGroupedDataFrame",
+      "description": "A grouped DataFrame object that requires an .agg() call to complete the computation."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.transform.agg",
+    "description": "Performs one or more aggregate functions on the entire DataFrame or on grouped data.",
+    "usage_context": "Used with .group_by() to compute aggregate values for each group (like sum, average, count). Can also be called directly on a DataFrame to aggregate over the entire table.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "aggregated_df = ${grouped_dataframe}.agg(${aggregation_expressions})",
+    "placeholders": [
+      {
+        "name": "grouped_dataframe",
+        "type": "DataFrame | RelationalGroupedDataFrame",
+        "description": "A regular DataFrame or an object returned by .group_by()."
+      },
+      {
+        "name": "aggregation_expressions",
+        "type": "Column | list[Column] | dict",
+        "description": "One or more aggregate expressions. E.g.: F.sum('sales').alias('total_sales'), F.avg('price')."
+      }
+    ],
+    "return_value": {
+      "type": "Snowpark DataFrame",
+      "description": "A new DataFrame containing the aggregation results."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.transform.limit",
+    "description": "Returns the first N rows of the DataFrame.",
+    "usage_context": "Used to get a small sample of data for testing or previewing when working with large datasets. It's often combined with .sort() to ensure deterministic results.",
+    "required_imports": [],
+    "code_snippet": "limited_df = ${dataframe_variable}.limit(${row_limit})",
+    "placeholders": [
+      {
+        "name": "dataframe_variable",
+        "type": "Snowpark DataFrame",
+        "description": "The source DataFrame instance."
+      },
+      {
+        "name": "row_limit",
+        "type": "int",
+        "description": "The number of rows to return."
+      }
+    ],
+    "return_value": {
+      "type": "Snowpark DataFrame",
+      "description": "A new DataFrame containing at most N rows."
+    }
+  },
+  {
+    "id": "snowpark.functions.col",
+    "description": "References a column by its name.",
+    "usage_context": "The most basic way to select a column to be used in functions like .select(), .filter(), or .with_column().",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.col(\"${column_name}\")",
+    "placeholders": [
+      {
+        "name": "column_name",
+        "type": "string",
+        "description": "The name of the column you want to reference."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A Column object representing the specified column."
+    }
+  },
+  {
+    "id": "snowpark.functions.lit",
+    "description": "Creates a column with a literal (constant) value.",
+    "usage_context": "Used when you need to add a constant value as a new column or compare a column to a fixed value in a transformation.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.lit(${literal_value})",
+    "placeholders": [
+      {
+        "name": "literal_value",
+        "type": "any",
+        "description": "The constant value (string, integer, float, etc.) to be turned into a column."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object containing the literal value."
+    }
+  },
+  {
+    "id": "snowpark.functions.when",
+    "description": "Implements SQL CASE WHEN ... THEN ... ELSE ... END logic for complex conditional assignments.",
+    "usage_context": "Used within .with_column() or .select() to create a new column by assigning different values based on one or more conditions. Can be chained with multiple .when() calls to handle several cases.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.when(${condition_expression}, ${value_if_true}).otherwise(${value_if_false})",
+    "placeholders": [
+      {
+        "name": "condition_expression",
+        "type": "Column",
+        "description": "A boolean conditional expression, e.g., F.col('A') > 5."
+      },
+      {
+        "name": "value_if_true",
+        "type": "any",
+        "description": "The literal value or column expression to return if the condition is true."
+      },
+      {
+        "name": "value_if_false",
+        "type": "any",
+        "description": "The default literal value or column expression returned by .otherwise() if no conditions are met."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object that can be used in a DataFrame transformation."
+    }
+  },
+  {
+    "id": "snowpark.functions.cast",
+    "description": "Casts a column to a different data type.",
+    "usage_context": "Essential for data type normalization and preparation. For example, converting a string column containing numbers into an integer or float type for calculations. Both F.col('col').cast(type) and F.cast(F.col('col'), type) are valid syntaxes.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F",
+      "from snowflake.snowpark.types import IntegerType"
+    ],
+    "code_snippet": "F.col(${column_name}).cast(${target_type})",
+    "placeholders": [
+      {
+        "name": "column_name",
+        "type": "string",
+        "description": "The name of the column to be cast, e.g., 'MY_STRING_COL'."
+      },
+      {
+        "name": "target_type",
+        "type": "DataType",
+        "description": "The target data type from snowflake.snowpark.types, e.g., IntegerType()."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object with the specified data type."
+    }
+  },
+  {
+    "id": "snowpark.functions.aggregation.sum",
+    "description": "Computes the sum of a specified column or expression.",
+    "usage_context": "Used inside an .agg() function to calculate the total of a numeric column, for example, to find the total sales amount.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.sum(${column_or_expression})",
+    "placeholders": [
+      {
+        "name": "column_or_expression",
+        "type": "string | Column",
+        "description": "The name of the column or expression to sum."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A Column object representing the sum."
+    }
+  },
+  {
+    "id": "snowpark.functions.aggregation.avg",
+    "description": "Computes the average of a specified column or expression.",
+    "usage_context": "Used inside an .agg() function to calculate the mean of a numeric column, for example, to find the average sale price.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.avg(${column_or_expression})",
+    "placeholders": [
+      {
+        "name": "column_or_expression",
+        "type": "string | Column",
+        "description": "The name of the column or expression to average."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A Column object representing the average value."
+    }
+  },
+  {
+    "id": "snowpark.functions.aggregation.min",
+    "description": "Computes the minimum value of a specified column or expression.",
+    "usage_context": "Used inside an .agg() function to find the minimum value in a group or across the entire DataFrame.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.min(${column_or_expression})",
+    "placeholders": [
+      {
+        "name": "column_or_expression",
+        "type": "string | Column",
+        "description": "The name of the column or expression to find the minimum of."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A Column object representing the minimum value."
+    }
+  },
+  {
+    "id": "snowpark.functions.aggregation.max",
+    "description": "Computes the maximum value of a specified column or expression.",
+    "usage_context": "Used inside an .agg() function to find the maximum value in a group or across the entire DataFrame.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.max(${column_or_expression})",
+    "placeholders": [
+      {
+        "name": "column_or_expression",
+        "type": "string | Column",
+        "description": "The name of the column or expression to find the maximum of."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A Column object representing the maximum value."
+    }
+  },
+  {
+    "id": "snowpark.functions.aggregation.count",
+    "description": "Counts the number of rows, optionally for a specific column.",
+    "usage_context": "Used inside an .agg() function. F.count('*') counts all rows in a group, while F.count('col_name') counts non-null values in that specific column.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.count(${column_or_expression})",
+    "placeholders": [
+      {
+        "name": "column_or_expression",
+        "type": "string | Column",
+        "description": "The column to count, or '*' to count all rows."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A Column object representing the count."
+    }
+  },
+  {
+    "id": "snowpark.functions.aggregation.count_distinct",
+    "description": "Counts the number of distinct values in a column.",
+    "usage_context": "Used inside an .agg() function to find the number of unique items in a group. For example, counting the number of unique customers who made a purchase.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.count_distinct(${column_object})",
+    "placeholders": [
+      {
+        "name": "column_object",
+        "type": "Column | string",
+        "description": "The column to count distinct values from, e.g., F.col('customer_id') or 'customer_id'."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A Column object representing the count of distinct values."
+    }
+  },
+  {
+    "id": "snowpark.functions.string.upper",
+    "description": "Converts a string column to uppercase.",
+    "usage_context": "A common data cleaning and standardization step to ensure case-insensitive matching or grouping on string columns.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.upper(F.col(\"${column_name}\"))",
+    "placeholders": [
+      {
+        "name": "column_name",
+        "type": "string",
+        "description": "The name of the string column to convert to uppercase."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object with the string converted to uppercase."
+    }
+  },
+  {
+    "id": "snowpark.functions.string.lower",
+    "description": "Converts a string column to lowercase.",
+    "usage_context": "A common data cleaning and standardization step to ensure case-insensitive matching or grouping on string columns.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.lower(F.col(\"${column_name}\"))",
+    "placeholders": [
+      {
+        "name": "column_name",
+        "type": "string",
+        "description": "The name of the string column to convert to lowercase."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object with the string converted to lowercase."
+    }
+  },
+  {
+    "id": "snowpark.functions.string.substring",
+    "description": "Extracts a substring from a string column.",
+    "usage_context": "Used for extracting specific parts of a string, such as an area code from a phone number or a year from a date string.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.substring(F.col(\"${column_name}\"), ${start_position}, ${length})",
+    "placeholders": [
+      {
+        "name": "column_name",
+        "type": "string",
+        "description": "The name of the string column."
+      },
+      {
+        "name": "start_position",
+        "type": "int",
+        "description": "The starting position of the substring (1-based)."
+      },
+      {
+        "name": "length",
+        "type": "int",
+        "description": "The length of the substring to extract."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object containing the extracted substring."
+    }
+  },
+  {
+    "id": "snowpark.functions.string.concat",
+    "description": "Concatenates multiple string columns or literals together.",
+    "usage_context": "Used to combine several columns into a single string column, for example, creating a full name from first name and last name columns. It can accept two or more arguments.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.concat(${column1}, F.lit(' '), ${column2}, ...)",
+    "placeholders": [
+      {
+        "name": "column1",
+        "type": "Column",
+        "description": "The first column or literal to concatenate."
+      },
+      {
+        "name": "column2",
+        "type": "Column",
+        "description": "The second column or literal to concatenate."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object containing the concatenated string."
+    }
+  },
+  {
+    "id": "snowpark.functions.string.regexp_replace",
+    "description": "Replaces substrings matching a regular expression pattern.",
+    "usage_context": "Used for complex data cleaning tasks, such as removing special characters, standardizing formats, or extracting sub-patterns from a string.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.regexp_replace(F.col(\"${subject_column}\"), \"${pattern}\", \"${replacement}\")",
+    "placeholders": [
+      {
+        "name": "subject_column",
+        "type": "string",
+        "description": "The name of the source string column to operate on."
+      },
+      {
+        "name": "pattern",
+        "type": "string",
+        "description": "The regular expression pattern to match."
+      },
+      {
+        "name": "replacement",
+        "type": "string",
+        "description": "The string to replace the matched parts with."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object containing the result after replacement."
+    }
+  },
+  {
+    "id": "snowpark.functions.string.trim",
+    "description": "Removes leading and trailing whitespace from a string column.",
+    "usage_context": "A standard data cleaning function to ensure that strings do not have unwanted spaces that could affect joins or grouping.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.trim(F.col(\"${column_name}\"))",
+    "placeholders": [
+      {
+        "name": "column_name",
+        "type": "string",
+        "description": "The name of the string column to trim."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object with whitespace trimmed."
+    }
+  },
+  {
+    "id": "snowpark.functions.date_time.year",
+    "description": "Extracts the year from a date or timestamp column.",
+    "usage_context": "Used for feature engineering or grouping data by year.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.year(F.col(\"${date_column}\"))",
+    "placeholders": [
+      {
+        "name": "date_column",
+        "type": "string",
+        "description": "The name of the column containing date or timestamp data."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object containing the year as an integer."
+    }
+  },
+  {
+    "id": "snowpark.functions.date_time.month",
+    "description": "Extracts the month from a date or timestamp column.",
+    "usage_context": "Used for feature engineering or grouping data by month.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.month(F.col(\"${date_column}\"))",
+    "placeholders": [
+      {
+        "name": "date_column",
+        "type": "string",
+        "description": "The name of the column containing date or timestamp data."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object containing the month as an integer (1-12)."
+    }
+  },
+  {
+    "id": "snowpark.functions.date_time.dayofmonth",
+    "description": "Extracts the day of the month from a date or timestamp column.",
+    "usage_context": "Used for feature engineering or filtering data based on the day of the month.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.dayofmonth(F.col(\"${date_column}\"))",
+    "placeholders": [
+      {
+        "name": "date_column",
+        "type": "string",
+        "description": "The name of the column containing date or timestamp data."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object containing the day of the month as an integer (1-31)."
+    }
+  },
+  {
+    "id": "snowpark.functions.date_time.to_date",
+    "description": "Converts a string expression to a Date type.",
+    "usage_context": "Used to parse string columns that represent dates into a proper Date type for date-based calculations and functions. An optional format string can be provided; if omitted, Snowflake will attempt to auto-detect the format.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.to_date(F.col(\"${string_column}\"), \"${format}\")",
+    "placeholders": [
+      {
+        "name": "string_column",
+        "type": "string",
+        "description": "The name of the string column to convert."
+      },
+      {
+        "name": "format",
+        "type": "string",
+        "description": "Optional. The format of the date string, e.g., 'YYYY-MM-DD'. If not provided, auto-detection is used."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object of DateType."
+    }
+  },
+  {
+    "id": "snowpark.functions.date_time.to_timestamp",
+    "description": "Converts a string expression to a Timestamp type.",
+    "usage_context": "Used to parse string columns that represent timestamps into a proper Timestamp type for time-based calculations and functions. An optional format string can be provided; if omitted, Snowflake will attempt to auto-detect the format.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.to_timestamp(F.col(\"${string_column}\"), \"${format}\")",
+    "placeholders": [
+      {
+        "name": "string_column",
+        "type": "string",
+        "description": "The name of the string column to convert."
+      },
+      {
+        "name": "format",
+        "type": "string",
+        "description": "Optional. The format of the timestamp string, e.g., 'YYYY-MM-DD HH24:MI:SS'. If not provided, auto-detection is used."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object of TimestampType."
+    }
+  },
+  {
+    "id": "snowpark.functions.date_time.current_date",
+    "description": "Returns the current date of the system.",
+    "usage_context": "Used to get the current date at the time of query execution, often for filtering data to 'today' or stamping records with a load date.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.current_date()",
+    "placeholders": [],
+    "return_value": {
+      "type": "Column",
+      "description": "A Column object representing the current date."
+    }
+  },
+  {
+    "id": "snowpark.functions.date_time.current_timestamp",
+    "description": "Returns the current timestamp at the start of the query execution.",
+    "usage_context": "Used to add a processing timestamp to records, for example, in an ETL job to mark when a row was last updated.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.current_timestamp()",
+    "placeholders": [],
+    "return_value": {
+      "type": "Column",
+      "description": "A Column object representing the current timestamp."
+    }
+  },
+  {
+    "id": "snowpark.functions.semi_structured.get",
+    "description": "Extracts an element from a VARIANT, ARRAY, or OBJECT by path or index.",
+    "usage_context": "The core function for handling JSON or other semi-structured data. Use dot notation for nested objects (e.g., 'parent.child') or an integer for array elements (e.g., 0).",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.get(F.col(\"${variant_column}\"), ${field_or_index})",
+    "placeholders": [
+      {
+        "name": "variant_column",
+        "type": "string",
+        "description": "The name of the column of type VARIANT, ARRAY, or OBJECT."
+      },
+      {
+        "name": "field_or_index",
+        "type": "string | int",
+        "description": "The field name (e.g., 'user.name') or index (e.g., 0) to extract."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object containing the extracted element, with its type as VARIANT."
+    }
+  },
+  {
+    "id": "snowpark.functions.semi_structured.array_construct",
+    "description": "Creates an array from multiple columns.",
+    "usage_context": "Used to construct an ARRAY column from several existing columns or literal values.",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.array_construct(${column1}, ${column2})",
+    "placeholders": [
+      {
+        "name": "column1",
+        "type": "Column",
+        "description": "The first column or literal to include in the array."
+      },
+      {
+        "name": "column2",
+        "type": "Column",
+        "description": "The second column or literal to include in the array."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object of ArrayType."
+    }
+  },
+  {
+    "id": "snowpark.functions.semi_structured.object_construct",
+    "description": "Creates a JSON object from key-value pairs.",
+    "usage_context": "Used to construct an OBJECT column from pairs of keys (as literals) and values (as columns or literals).",
+    "required_imports": [
+      "from snowflake.snowpark import functions as F"
+    ],
+    "code_snippet": "F.object_construct(F.lit('${key1}'), ${value_column1}, F.lit('${key2}'), ${value_column2})",
+    "placeholders": [
+      {
+        "name": "key1",
+        "type": "string",
+        "description": "The literal string for the first key."
+      },
+      {
+        "name": "value_column1",
+        "type": "Column",
+        "description": "The column or literal for the first value."
+      },
+      {
+        "name": "key2",
+        "type": "string",
+        "description": "The literal string for the second key."
+      },
+      {
+        "name": "value_column2",
+        "type": "Column",
+        "description": "The column or literal for the second value."
+      }
+    ],
+    "return_value": {
+      "type": "Column",
+      "description": "A new Column object of ObjectType."
+    }
+  },
+  {
+    "id": "snowpark.udf.registration",
+    "description": "Registers a Python function as a scalar User-Defined Function (UDF) in Snowpark.",
+    "usage_context": "Use a UDF when built-in Snowpark functions cannot meet complex business logic. UDFs can be used as decorators (@udf) or as a regular function call (session.udf.register).",
+    "required_imports": [
+      "from snowflake.snowpark.functions import udf",
+      "from snowflake.snowpark.types import IntegerType, StringType"
+    ],
+    "code_snippet": "@udf(name=\"${udf_name}\", return_type=${return_type}, input_types=[${input_types}])\ndef ${python_function_name}(${arguments}):\n    # Your Python logic here\n    return ${result}",
+    "placeholders": [
+      {
+        "name": "udf_name",
+        "type": "string",
+        "description": "The name of the UDF to be registered in Snowflake."
+      },
+      {
+        "name": "return_type",
+        "type": "DataType",
+        "description": "The data type of the UDF's return value, e.g., IntegerType(), StringType()."
+      },
+      {
+        "name": "input_types",
+        "type": "list[DataType]",
+        "description": "A list containing the data types of the UDF's input parameters."
+      },
+      {
+        "name": "python_function_name",
+        "type": "string",
+        "description": "The name of the Python function."
+      },
+      {
+        "name": "arguments",
+        "type": "string",
+        "description": "The argument list of the Python function."
+      },
+      {
+        "name": "result",
+        "type": "any",
+        "description": "The computed result returned by the function."
+      }
+    ],
+    "return_value": {
+      "type": "UserDefinedFunction",
+      "description": "A UDF object that can be called in DataFrame operations."
+    }
+  },
+  {
+    "id": "snowpark.read.from_stage",
+    "description": "Reads data from files in a stage (e.g., CSV, Parquet, JSON) and creates a DataFrame.",
+    "usage_context": "The standard way to load semi-structured files stored in a Snowflake stage (internal or external) into Snowpark for processing. The DataFrameReader provides rich options for configuring parsing behavior.",
+    "required_imports": [
+      "from snowflake.snowpark.types import StructType, StructField, StringType"
+    ],
+    "code_snippet": "df = session.read.option(\"type\", \"${file_format}\").schema(${schema_object}).load(\"${stage_location}\")",
+    "placeholders": [
+      {
+        "name": "file_format",
+        "type": "string",
+        "description": "The format of the file, e.g., 'csv', 'json', 'parquet'."
+      },
+      {
+        "name": "schema_object",
+        "type": "StructType",
+        "description": "A StructType object defining the data schema. Recommended for CSVs for reliability, but can be inferred. Parquet files include schema, and JSON is often read into a single VARIANT column."
+      },
+      {
+        "name": "stage_location",
+        "type": "string",
+        "description": "The path to the files within the stage, e.g., '@my_stage/data/files/'."
+      }
+    ],
+    "return_value": {
+      "type": "Snowpark DataFrame",
+      "description": "A DataFrame representing the data from the staged files."
+    }
+  },
+  {
+    "id": "snowpark.write.save_as_table",
+    "description": "Saves the contents of a DataFrame to a Snowflake table.",
+    "usage_context": "The standard method for persisting the final result of a data transformation pipeline to the Snowflake database. The write mode can be set to control behavior like append, overwrite, or error if the table exists.",
+    "required_imports": [],
+    "code_snippet": "${dataframe_variable}.write.mode(\"${save_mode}\").save_as_table(\"${table_name}\")",
+    "placeholders": [
+      {
+        "name": "dataframe_variable",
+        "type": "Snowpark DataFrame",
+        "description": "The DataFrame to be saved."
+      },
+      {
+        "name": "save_mode",
+        "type": "string",
+        "description": "The save mode, can be 'append', 'overwrite', 'ignore', 'errorifexists'."
+      },
+      {
+        "name": "table_name",
+        "type": "string",
+        "description": "The name of the target Snowflake table to write to."
+      }
+    ],
+    "return_value": {
+      "type": "None",
+      "description": "This method has no return value."
+    }
+  },
+  {
+    "id": "snowpark.dataframe.copy_into_location",
+    "description": "Unloads the data from a DataFrame into a specified internal or external stage.",
+    "usage_context": "Used to export processing results from Snowpark into file formats (like CSV, Parquet) for sharing with other systems or for archival. This essentially executes a COPY INTO @location command.",
+    "required_imports": [],
+    "code_snippet": "${dataframe_variable}.copy_into_location(\"${stage_location}\")",
+    "placeholders": [
+      {
+        "name": "dataframe_variable",
+        "type": "Snowpark DataFrame",
+        "description": "The DataFrame to be unloaded."
+      },
+      {
+        "name": "stage_location",
+        "type": "string",
+        "description": "The stage location to unload to, e.g., '@my_unload_stage/output/'."
+      }
+    ],
+    "return_value": {
+      "type": "CopyResult",
+      "description": "An object containing the results of the unload operation (e.g., rows written, bytes written)."
+    }
+  }
+]
