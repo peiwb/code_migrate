@@ -7,6 +7,7 @@ for converting from PySpark to Snowpark, known as "Code Recipes".
 """
 
 import json
+from services.llm_service import CortexLLMService
 
 
 class KnowledgeServiceError(Exception):
@@ -19,7 +20,7 @@ class KnowledgeService:
     Core knowledge service that manages migration rules and provides recipe lookup functionality.
     """
 
-    def __init__(self, knowledge_base_path: str, llm_service: "CortexLLMService" = None):
+    def __init__(self, knowledge_base_path: str, llm_service: CortexLLMService = None):
         """
         Initialize the knowledge service instance and load the knowledge base.
 
