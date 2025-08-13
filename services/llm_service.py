@@ -18,7 +18,7 @@ class LLMServiceError(Exception):
 
 class CortexLLMService:
     """
-    Claude 4 API LLM Service Class
+    Claude 4 API LLM Service Class (Compatible with Cortex interface)
 
     Responsible for managing connection with Claude 4 API and providing
     unified LLM calling interfaces. Agents only need to focus on "what questions to ask"
@@ -107,6 +107,10 @@ class CortexLLMService:
         """
         Send a prompt and force the LLM to return a JSON object conforming to specified structure.
 
+        **IMPORTANT**: This method uses positional parameters to match Cortex API interface:
+        - First parameter: prompt (str)
+        - Second parameter: json_schema (dict)
+
         Args:
             prompt (str): Complete prompt text to send to the LLM
             json_schema (dict): Python dictionary describing expected JSON structure and types,
@@ -119,41 +123,52 @@ class CortexLLMService:
             LLMServiceError: Raised when API call fails or JSON parsing fails
         """
         try:
-            # Define a tool that forces JSON output with the specified schema
-            tools = [
-                {
-                    "name": "generate_structured_output",
-                    "description": "Generate structured JSON output following the specified schema",
-                    "input_schema": {
-                        "type": "object",
-                        **json_schema
-                    }
-                }
-            ]
+            # Build enhanced prompt that explicitly requests JSON format
+            enhanced_prompt = f"""{prompt}
+
+Please respond with a JSON object that strictly follows this schema:
+{json.dumps(json_schema, indent=2)}
+
+Your response must be valid JSON that can be parsed directly."""
 
             response = self.client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=8192,
-                tools=tools,
-                tool_choice={"type": "tool", "name": "generate_structured_output"},
                 messages=[
                     {
                         "role": "user",
-                        "content": prompt
+                        "content": enhanced_prompt
                     }
                 ]
             )
 
-            # Extract tool use result
-            for content in response.content:
-                if content.type == "tool_use" and content.name == "generate_structured_output":
-                    return content.input
+            # Extract the response text
+            response_text = response.content[0].text.strip()
 
-            # Fallback if no tool use found
-            raise LLMServiceError("No structured output generated from Claude 4 API")
+            # Try to parse as JSON
+            try:
+                parsed_response = json.loads(response_text)
+                return parsed_response
+            except json.JSONDecodeError:
+                # If direct parsing fails, try to extract JSON from the response
+                # Look for JSON block between ```json and ``` or just {}
+                import re
+                json_pattern = r'```json\s*(.*?)\s*```|```\s*(.*?)\s*```|(\{.*\})'
+                matches = re.findall(json_pattern, response_text, re.DOTALL)
 
-        except LLMServiceError:
-            # Re-raise our custom exceptions
-            raise
+                for match in matches:
+                    for group in match:
+                        if group.strip():
+                            try:
+                                parsed_response = json.loads(group.strip())
+                                return parsed_response
+                            except json.JSONDecodeError:
+                                continue
+
+                # If all parsing attempts fail, raise error
+                raise json.JSONDecodeError("Could not extract valid JSON from response", response_text, 0)
+
+        except json.JSONDecodeError as e:
+            raise LLMServiceError(f"Failed to parse JSON response from Claude 4 API: {e}")
         except Exception as e:
             raise LLMServiceError(f"Failed to get JSON completion from Claude 4 API: {e}")
