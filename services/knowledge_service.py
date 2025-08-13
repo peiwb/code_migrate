@@ -9,6 +9,8 @@ match Python functions (PySpark/Pandas/native Python) to appropriate Snowpark re
 import json
 from typing import List, Dict, Any, Optional
 from services.llm_service import CortexLLMService
+import os
+from datetime import datetime
 
 
 class KnowledgeServiceError(Exception):
@@ -36,6 +38,46 @@ class KnowledgeService:
         self.llm_service = llm_service
         self.recipes = {}
         self._load_knowledge_base(knowledge_base_path)
+
+    def _debug_save_prompt_and_context(self, prompt, python_functions, top_k):
+        """调试用：保存prompt和context到文件"""
+        try:
+            # 确保debug目录存在
+            debug_dir = "./debug_output"
+            if not os.path.exists(debug_dir):
+                os.makedirs(debug_dir)
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+            # 保存完整的知识库context
+            context_file = os.path.join(debug_dir, f"knowledge_base_context_{timestamp}.txt")
+            with open(context_file, 'w', encoding='utf-8') as f:
+                f.write("KNOWLEDGE BASE - ALL RECIPES\n")
+                f.write("=" * 50 + "\n\n")
+                f.write(f"Total recipes: {len(self.recipes)}\n\n")
+
+                for i, (recipe_id, recipe) in enumerate(self.recipes.items(), 1):
+                    f.write(f"[{i:2d}] ID: {recipe_id}\n")
+                    f.write(f"     Description: {recipe.get('description', 'No description')}\n")
+                    # usage = recipe.get('usage_context', '')
+                    # if usage:
+                    #     f.write(f"     Usage: {usage}\n")
+                    f.write("\n")
+
+            # 保存完整的prompt
+            prompt_file = os.path.join(debug_dir, f"llm_prompt_{timestamp}.txt")
+            with open(prompt_file, 'w', encoding='utf-8') as f:
+                f.write("COMPLETE LLM PROMPT\n")
+                f.write("=" * 50 + "\n\n")
+                f.write(f"Input functions: {python_functions}\n")
+                f.write(f"Top K: {top_k}\n")
+                f.write(f"Prompt length: {len(prompt)} chars\n")
+                f.write("=" * 50 + "\n\n")
+                f.write(prompt)
+
+            print(f"Debug files saved: {context_file}, {prompt_file}")
+        except Exception as e:
+            print(f"Debug save failed (non-critical): {e}")
 
     def _load_knowledge_base(self, knowledge_base_path: str):
         """Load and parse the knowledge base JSON file."""
@@ -84,6 +126,8 @@ class KnowledgeService:
         try:
             # Build LLM prompt with all available recipes as context
             prompt = self._build_discovery_prompt(python_functions, top_k)
+
+            #self._debug_save_prompt_and_context(prompt, python_functions, top_k)
 
             # Define JSON schema for LLM response
             json_schema = {
@@ -184,11 +228,11 @@ OUTPUT FORMAT:
 
         for recipe_id, recipe in self.recipes.items():
             description = recipe.get('description', 'No description available')
-            usage_context = recipe.get('usage_context', '')
+            #usage_context = recipe.get('usage_context', '')
 
             context_block = f"ID: {recipe_id}\nDescription: {description}"
-            if usage_context:
-                context_block += f"\nUsage Context: {usage_context}"
+            #if usage_context:
+            #   context_block += f"\nUsage Context: {usage_context}"
 
             context_blocks.append(context_block)
 
