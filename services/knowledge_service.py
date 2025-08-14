@@ -123,6 +123,9 @@ class KnowledgeService:
         if top_k is None:
             top_k = max(3, min(12, len(python_functions) * 2))
 
+        if not python_functions:
+            return []
+
         try:
             # Build LLM prompt with all available recipes as context
             prompt = self._build_discovery_prompt(python_functions, top_k)
