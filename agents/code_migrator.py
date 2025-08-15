@@ -2,6 +2,7 @@
 Code Migrator Module (code_migrator.py)
 
 Core execution engine for PySpark to Snowpark code migration using LLM assistance.
+Implements a "triage doctor" approach for intelligent migration decision-making.
 """
 
 from typing import List, Dict, Any
@@ -10,7 +11,7 @@ from services.knowledge_service import KnowledgeService
 
 
 class MigrationError(Exception):
-    """Custom exception for migration-related errors."""
+    """用于迁移过程中发生的特定错误。"""
     pass
 
 
@@ -28,29 +29,162 @@ class CodeMigrator:
             knowledge_service: KnowledgeService
     ) -> str:
         """
-        Migrate a PySpark function to Snowpark equivalent.
+        Migrate a PySpark function to Snowpark equivalent using triage approach.
 
         Args:
             source_code: Function code with inline migration guidance
+            function_analysis: Analysis data containing dependencies info
+            knowledge_service: Knowledge service instance
+
+        Returns:
+            str: Migrated Snowpark function code or manual intervention stub
+        """
+        try:
+            # Extract dependencies from analysis
+            dependencies = function_analysis['dependencies']['external_packages']
+
+            # Check migration feasibility (triage)
+            decision = self._check_migration_feasibility(dependencies)
+
+            # Execute based on triage decision
+            if decision['action'] == 'ABORT_AND_FLAG':
+                return self._generate_manual_intervention_stub(
+                    decision['details'][0], source_code
+                )
+            elif decision['action'] == 'PROCEED_AND_MIGRATE':
+                return self._run_llm_migration(source_code, function_analysis, knowledge_service)
+            elif decision['action'] == 'PROCEED_AND_ANNOTATE':
+                migrated_code = self._run_llm_migration(source_code, function_analysis, knowledge_service)
+                return self._add_annotations_for_custom_modules(migrated_code, decision['details'])
+
+        except Exception as e:
+            raise MigrationError(f"Failed to migrate function: {str(e)}") from e
+
+    def _check_migration_feasibility(self, dependencies: List[str]) -> dict:
+        """
+        Check migration feasibility using triage logic.
+
+        Args:
+            dependencies: List of import statements from function analysis
+
+        Returns:
+            dict: Decision object with 'action' and 'details' keys
+        """
+        # Define fatal (non-migratable) dependencies
+        fatal_keywords = ['config.spark_config', 'requests', 'boto3', 'os.path.exists']
+
+        # Define custom module patterns
+        custom_module_keywords = ['utils.', 'libs.', 'common.']
+
+        action = 'PROCEED_AND_MIGRATE'
+        custom_modules_found = []
+
+        for import_statement in dependencies:
+            # Check for fatal dependencies first
+            if any(keyword in import_statement for keyword in fatal_keywords):
+                return {'action': 'ABORT_AND_FLAG', 'details': [import_statement]}
+
+            # Check for custom modules
+            if any(keyword in import_statement for keyword in custom_module_keywords):
+                custom_modules_found.append(import_statement)
+
+        # Return decision based on findings
+        if custom_modules_found:
+            return {'action': 'PROCEED_AND_ANNOTATE', 'details': custom_modules_found}
+
+        return {'action': 'PROCEED_AND_MIGRATE', 'details': []}
+
+    def _run_llm_migration(
+            self,
+            source_code: str,
+            function_analysis: dict,
+            knowledge_service: KnowledgeService
+    ) -> str:
+        """
+        Execute standard LLM-based code migration.
+
+        Args:
+            source_code: Function code to migrate
             function_analysis: Analysis data from code_analyzer
             knowledge_service: Knowledge service instance
 
         Returns:
-            str: Migrated Snowpark function code
+            str: LLM-generated migrated code
         """
-        try:
-            # Get suggested patterns and recipes
-            suggested_patterns = function_analysis.get('suggested_patterns', [])
-            recipes = knowledge_service.get_recipes_from_suggested_patterns(suggested_patterns)
+        # Get suggested patterns and recipes
+        suggested_patterns = function_analysis.get('suggested_patterns', [])
+        recipes = knowledge_service.get_recipes_from_suggested_patterns(suggested_patterns)
 
-            # Build migration prompt and get LLM response
-            prompt = self._build_migration_prompt(source_code, recipes)
-            response = self.llm_service.get_text_completion(prompt)
+        # Build migration prompt and get LLM response
+        prompt = self._build_migration_prompt(source_code, recipes)
+        response = self.llm_service.get_text_completion(prompt)
 
-            return response.strip()
+        return response.strip()
 
-        except Exception as e:
-            raise MigrationError(f"Failed to migrate function: {str(e)}") from e
+    def _add_annotations_for_custom_modules(
+            self,
+            migrated_code: str,
+            custom_imports: List[str]
+    ) -> str:
+        """
+        Add warning annotations for custom module imports.
+
+        Args:
+            migrated_code: Code generated by LLM migration
+            custom_imports: List of custom import statements to annotate
+
+        Returns:
+            str: Code with warning annotations added
+        """
+        WARNING_TEMPLATE = """# MIGRATION TOOL WARNING: Manual check required for the following custom import.
+# Please ensure the module '{module_name}' is available in the Snowpark environment
+# and its internal logic is compatible."""
+
+        result_code = migrated_code
+
+        for import_statement in custom_imports:
+            # Extract module name from import statement
+            if 'from ' in import_statement:
+                module_name = import_statement.split('from ')[1].split(' import')[0].strip()
+            elif 'import ' in import_statement:
+                module_name = import_statement.split('import ')[1].split(' as')[0].strip()
+            else:
+                module_name = 'unknown'
+
+            # Replace import with annotated version
+            warning = WARNING_TEMPLATE.format(module_name=module_name)
+            annotated_import = f"{warning}\n{import_statement}"
+            result_code = result_code.replace(import_statement, annotated_import)
+
+        return result_code
+
+    def _generate_manual_intervention_stub(self, reason: str, source_code: str) -> str:
+        """
+        Generate manual intervention stub for non-migratable functions.
+
+        Args:
+            reason: Reason for migration abort
+            source_code: Original PySpark function code
+
+        Returns:
+            str: Formatted warning stub with original code
+        """
+        return f"""
+# ##############################################################################
+# ### MIGRATION SKIPPED: MANUAL INTERVENTION REQUIRED                          ###
+# ##############################################################################
+#
+# REASON: {reason}
+#
+# The following PySpark function could not be automatically migrated.
+# Please review the code and manually convert it to its Snowpark equivalent.
+#
+# --- ORIGINAL PYSPARK CODE ---
+#
+'''
+{source_code}
+'''
+"""
 
     def _build_migration_prompt(self, function_code: str, recipes: list) -> str:
         """Build the complete migration prompt for the LLM."""

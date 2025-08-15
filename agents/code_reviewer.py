@@ -1,10 +1,10 @@
 """
-Code Reviewer Module (code_reviewer.py) - V1.1
+Code Reviewer Module (code_reviewer.py) - V2.0
 
-This module serves as the fourth and final executor in the migration workflow,
-acting as an Automated Reviewer and Corrector. It performs a two-step process:
-1. Review: Intelligent review of migrated Snowpark functions against original PySpark code
-2. Correct: Automatic correction based on review findings to produce optimized final code
+This module serves as the final quality gate in the migration workflow,
+implementing an "Auditor + Surgeon" two-phase approach:
+1. Auditor: Rigorous review and issue identification with structured JSON report
+2. Surgeon: Precise, mechanical correction application based on audit findings
 """
 
 import json
@@ -20,25 +20,25 @@ class ReviewError(Exception):
 
 class CodeReviewer:
     """
-    Automated code reviewer and corrector for PySpark to Snowpark migrations.
+    Automated code reviewer and corrector implementing the Auditor + Surgeon pattern.
 
-    Uses LLM-driven intelligence through two carefully designed prompts to perform
-    comprehensive review and correction of migrated code.
+    Phase 1 (Auditor): Identifies issues and generates structured JSON audit report
+    Phase 2 (Surgeon): Mechanically applies corrections based on audit findings
     """
 
     def __init__(self, llm_service: CortexLLMService):
-        """Initialize the code reviewer instance."""
+        """Initialize the code reviewer with LLM service."""
         self.llm_service = llm_service
 
     def review_and_correct_migration(
-            self,
-            original_function_code: str,
-            migrated_function_code: str,
-            knowledge_service: KnowledgeService,
-            function_analysis: dict
+        self,
+        original_function_code: str,
+        migrated_function_code: str,
+        knowledge_service: KnowledgeService,
+        function_analysis: dict
     ) -> dict:
         """
-        Main public entry point for the complete review-correction workflow.
+        Main entry point for the complete auditor-surgeon workflow.
 
         Returns:
             dict: Contains 'review_report' (dict) and 'corrected_code' (str)
@@ -48,13 +48,22 @@ class CodeReviewer:
             suggested_patterns = function_analysis.get('suggested_patterns', [])
             recipes = knowledge_service.get_recipes_from_suggested_patterns(suggested_patterns)
 
-            # Phase 1: Review
-            review_report = self._get_review_report(
+            # Phase 1: Auditor - Generate review report
+            review_report = self._generate_review_report(
                 original_function_code, migrated_function_code, recipes
             )
 
-            # Phase 2: Correct
-            corrected_code = self._apply_corrections(migrated_function_code, review_report)
+            # Check audit results and determine next action
+            status = review_report['overall_assessment']['status']
+
+            if status == 'PERFECT':
+                # No corrections needed
+                corrected_code = migrated_function_code
+            elif status == 'NEEDS_REFINEMENT':
+                # Phase 2: Surgeon - Apply corrections
+                corrected_code = self._apply_corrections(migrated_function_code, review_report)
+            else:
+                raise ReviewError(f"Invalid audit status: {status}")
 
             return {
                 'review_report': review_report,
@@ -64,8 +73,10 @@ class CodeReviewer:
         except Exception as e:
             raise ReviewError(f"Failed to complete review and correction process: {str(e)}")
 
-    def _get_review_report(self, original_code: str, migrated_code: str, recipes: list) -> dict:
-        """Execute the review phase to generate structured review report."""
+    # === Phase 1: Auditor Implementation ===
+
+    def _generate_review_report(self, original_code: str, migrated_code: str, recipes: list) -> dict:
+        """Execute audit phase to generate structured review report."""
         try:
             prompt = self._build_review_prompt(original_code, migrated_code, recipes)
             return self.llm_service.get_json_completion(
@@ -75,8 +86,102 @@ class CodeReviewer:
         except Exception as e:
             raise ReviewError(f"Failed to generate review report: {str(e)}")
 
+    def _get_review_json_schema(self) -> dict:
+        """Define structured JSON schema for machine-executable audit report."""
+        return {
+            "type": "object",
+            "properties": {
+                "overall_assessment": {
+                    "type": "object",
+                    "properties": {
+                        "status": {
+                            "type": "string",
+                            "enum": ["PERFECT", "NEEDS_REFINEMENT"],
+                            "description": "PERFECT if code is flawless; NEEDS_REFINEMENT otherwise."
+                        },
+                        "summary": {
+                            "type": "string",
+                            "description": "Overall textual summary of migration quality."
+                        }
+                    },
+                    "required": ["status", "summary"]
+                },
+                "findings": {
+                    "type": "array",
+                    "description": "List of specific issue findings. Empty if status is PERFECT.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "category": {
+                                "type": "string",
+                                "enum": ["API_MISUSE", "LOGIC_DIVERGENCE", "BEST_PRACTICE_VIOLATION", "STYLE_ISSUE"],
+                                "description": "Classification of the issue."
+                            },
+                            "faulty_code_snippet": {
+                                "type": "string",
+                                "description": "Exact problematic code snippet from the reviewed code."
+                            },
+                            "issue_description": {
+                                "type": "string",
+                                "description": "Detailed description of the issue."
+                            },
+                            "suggested_correction": {
+                                "type": "string",
+                                "description": "Ready-to-use code snippet that directly replaces faulty_code_snippet."
+                            }
+                        },
+                        "required": ["category", "faulty_code_snippet", "issue_description", "suggested_correction"]
+                    }
+                }
+            },
+            "required": ["overall_assessment", "findings"]
+        }
+
+    def _build_review_prompt(self, original_code: str, migrated_code: str, recipes: list) -> str:
+        """Build comprehensive audit prompt for rigorous code review."""
+        formatted_recipes = self._format_recipes(recipes)
+
+        return f"""You are a meticulous and detail-oriented Snowpark code auditor. Your sole task is to audit the "Migrated Snowpark Function" against the "Original PySpark Function" and "Reference Materials".
+
+Your audit must be rigorous and objective. For every issue you find, you MUST provide the exact faulty code snippet and a direct, ready-to-use code snippet for its correction.
+
+---[Reference Materials]---
+{formatted_recipes}
+---[End of Reference Materials]---
+
+---[Original PySpark Function (Source of Truth for Intent)]---
+```python
+{original_code}
+```
+---[End of Original PySpark Function]---
+
+---[Migrated Snowpark Function (Target for Audit)]---
+```python
+{migrated_code}
+```
+---[End of Migrated Snowpark Function]---
+
+**Audit Checklist & Instructions:**
+
+1. **API Usage**: Compare API calls (e.g., groupBy, orderBy) against the reference materials. Are they correct Snowpark equivalents?
+
+2. **Logical Equivalence**: Does the migrated code's logic fully match the intent described in the original function's docstrings and comments?
+
+3. **Best Practices**: Does the code adhere to Snowpark best practices? (e.g., using with_column_renamed instead of select+alias for simple renaming)
+
+4. **Documentation Preservation**: Are function signatures, docstrings, and inline comments completely preserved?
+
+5. **TODO Flag Check**: Does it contain # TODO: [MANUAL MIGRATION REQUIRED] markers? If so, categorize as BEST_PRACTICE_VIOLATION.
+
+**Output Requirements:**
+Generate a JSON report based on the provided schema. For each finding, you MUST provide both faulty_code_snippet and suggested_correction. If the code is perfect, the findings array must be empty and the status must be PERFECT.
+
+Your response must be valid JSON only, with no additional text or explanations."""
+
+    # === Phase 2: Surgeon Implementation ===
+
     def _apply_corrections(self, migrated_code: str, review_report: dict) -> str:
-        """Execute the correction phase based on review findings."""
+        """Execute correction phase with mechanical precision based on audit findings."""
         try:
             prompt = self._build_correction_prompt(migrated_code, review_report)
             corrected_code = self.llm_service.get_text_completion(prompt=prompt)
@@ -84,82 +189,40 @@ class CodeReviewer:
         except Exception as e:
             raise ReviewError(f"Failed to apply corrections: {str(e)}")
 
-    def _build_review_prompt(self, original_code: str, migrated_code: str, recipes: list) -> str:
-        """Build the comprehensive review prompt for LLM evaluation."""
-        formatted_recipes = self._format_recipes(recipes)
-
-        return f"""You are an experienced Principal Software Engineer tasked with conducting a rigorous code review of a PySpark to Snowpark migration.
-
-You will receive three materials:
-1. **Original PySpark Function**: The pre-migration code.
-2. **Migrated Snowpark Function**: The post-migration code, which is your review target.
-3. **Authoritative Reference Materials**: Code recipes that represent expected transformation rules guiding the migration process.
-
-Your review must be objective, rigorous, and output in structured JSON format.
-
----[Authoritative Reference Materials]---
-{formatted_recipes}
----[End of Authoritative Reference Materials]---
-
----[Original PySpark Function]---
-```python
-{original_code}
-```
----[End of Original PySpark Function]---
-
----[Migrated Snowpark Function]---
-```python
-{migrated_code}
-```
----[End of Migrated Snowpark Function]---
-
-Please evaluate the "Migrated Snowpark Function" according to the following review checklist and generate a JSON-formatted review report.
-
-【Review Checklist】
-1. Logic Equivalence: Is the migrated code functionally and logically equivalent to the original code?
-2. Recipe Adherence: Does the migration correctly apply the code patterns defined in the "Authoritative Reference Materials"?
-3. Documentation & Comment Preservation: Are function signatures, docstrings, and all inline comments completely preserved?
-4. TODO Flag Check: Does it contain # TODO: [MANUAL MIGRATION REQUIRED] markers? If so, explicitly note this in the report.
-5. Overall Quality Assessment: Provide an overall evaluation of migration quality from code readability, conciseness, and Snowpark best practices perspectives.
-
-【Output Format】
-Your final output must be and can only be a well-formatted JSON object without any additional explanations."""
-
     def _build_correction_prompt(self, migrated_code: str, review_report: dict) -> str:
-        """Build the correction prompt for applying review suggestions."""
-        review_json = json.dumps(review_report, indent=2, ensure_ascii=False)
+        """Build precise correction prompt for mechanical code modification."""
+        review_json_string = json.dumps(review_report, indent=2, ensure_ascii=False)
 
-        return f"""You are a professional software engineer tasked with modifying and improving code based on a code review report.
+        return f"""You are a code modification robot. Your only task is to perform a series of precise "find and replace" operations on a given piece of code based on a JSON instruction list.
 
-You will receive two materials:
-1. **Code to be Corrected**: The initial version of code that needs your modifications.
-2. **Review Report**: A JSON object containing specific modification comments and suggestions.
-
-Your task is to carefully read every comment in the review report and apply all suggestions to the code, ultimately producing corrected, higher-quality code.
-
----[Code to be Corrected]---
+---[Code to Modify]---
 ```python
 {migrated_code}
 ```
----[End of Code to be Corrected]---
+---[End of Code to Modify]---
 
----[Review Report]---
-{review_json}
----[End of Review Report]---
+---[Modification Instruction List (JSON)]---
+{review_json_string}
+---[End of Modification Instruction List]---
 
-Please apply all suggestions from the review report to correct the code.
+**Instructions:**
+1. Iterate through each object in the "findings" array of the JSON list.
+2. For each object, find the exact code snippet specified in "faulty_code_snippet" within the "Code to Modify".
+3. Replace it precisely with the code from "suggested_correction".
+4. Do not perform any other changes, additions, or creative modifications.
+5. After applying all replacements, output the complete, final, modified code.
 
-【Output Format】
-Your final output must be and can only be the corrected, complete Python function code. Do not include any additional explanations, preambles, or Markdown markers."""
+**Your output must ONLY be the Python code itself, without any explanations or markdown formatting.**"""
+
+    # === Helper Methods ===
 
     def _format_recipes(self, recipes: list) -> str:
-        """Format recipes into readable text blocks for the prompt."""
+        """Format recipes into readable text blocks for prompt context."""
         if not recipes:
             return "No specific recipes available for this migration pattern."
 
         formatted_blocks = []
         for i, recipe in enumerate(recipes, 1):
-            # Handle different recipe structures
             recipe_id = recipe.get('pattern_name') or recipe.get('id', f'Recipe {i}')
             description = recipe.get('description', 'No description')
 
@@ -182,44 +245,6 @@ Your final output must be and can only be the corrected, complete Python functio
             formatted_blocks.append(block)
 
         return '\n'.join(formatted_blocks)
-
-    def _get_review_json_schema(self) -> dict:
-        """Get the JSON schema for structured review report output."""
-        return {
-            "type": "object",
-            "properties": {
-                "migration_confidence_score": {
-                    "type": "number",
-                    "description": "A float from 0.0 to 1.0 representing your overall confidence in this migration quality. 1.0 represents perfection."
-                },
-                "summary": {
-                    "type": "string",
-                    "description": "A summary review comment, e.g., 'High-quality migration, requires only minor modifications.' or 'Migration has major logical issues, requires manual refactoring.'"
-                },
-                "review_comments": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "category": {
-                                "type": "string",
-                                "description": "A category name, e.g., 'Logic', 'Style', 'Completeness', 'TODO'"
-                            },
-                            "comment": {
-                                "type": "string",
-                                "description": "Specific review comment."
-                            },
-                            "suggestion": {
-                                "type": "string",
-                                "description": "(Optional) Modification suggestion for this comment."
-                            }
-                        },
-                        "required": ["category", "comment"]
-                    }
-                }
-            },
-            "required": ["migration_confidence_score", "summary", "review_comments"]
-        }
 
     def _clean_code_output(self, code_text: str) -> str:
         """Clean and format the corrected code output from LLM."""

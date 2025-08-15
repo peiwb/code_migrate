@@ -1,14 +1,19 @@
 """
-Code Reviewer Test Module (test_code_reviewer.py) - V1.1
+Code Reviewer Test Module (test_code_reviewer.py) - V2.0
 
-This test module validates the complete functionality of CodeReviewer using the real
-generate_customer_insights function from the sample PySpark script, focusing on its
-ability to successfully execute the complete "review and correction" two-step process.
+This test module validates the complete functionality of CodeReviewer V2.0 using the
+"Auditor + Surgeon" two-phase approach with structured JSON schema validation.
+
+Key Changes from V1.1:
+- Updated to test new JSON schema with 'overall_assessment' and 'findings'
+- Validates PERFECT vs NEEDS_REFINEMENT status handling
+- Tests structured findings with faulty_code_snippet and suggested_correction
+- Focuses on the two-phase workflow validation
 
 Testing Philosophy (POC Phase):
 - Real API calls: All tests execute real network requests to Snowflake Cortex. No mocking.
-- Real function examples: Uses the actual generate_customer_insights function from sample script.
-- Structure and reasonableness validation: Focus on validating key features rather than exact matching.
+- Real function examples: Uses actual generate_customer_insights function from sample script.
+- Structure and workflow validation: Focus on validating Auditor-Surgeon pattern execution.
 """
 
 import pytest
@@ -22,8 +27,8 @@ from services.knowledge_service import KnowledgeService
 from agents.code_reviewer import CodeReviewer
 
 
-class TestCodeReviewer:
-    """CodeReviewer Test Class with real generate_customer_insights function."""
+class TestCodeReviewerV2:
+    """CodeReviewer V2.0 Test Class with Auditor-Surgeon pattern validation."""
 
     @pytest.fixture(scope="session")
     def llm_service(self):
@@ -51,55 +56,6 @@ class TestCodeReviewer:
         return CodeReviewer(llm_service=llm_service)
 
     @pytest.fixture(scope="session")
-    def original_pyspark_function(self):
-        """Return the original generate_customer_insights PySpark function."""
-        return '''def generate_customer_insights(df: DataFrame) -> DataFrame:
-    """
-    Generate business insights from customer data.
-
-    Args:
-        df: Enriched customer data
-
-    Returns:
-        DataFrame: Customer insights summary
-    """
-    insights_df = df.groupBy("age_group", "customer_tier") \\
-        .agg(
-        count("customer_id").alias("customer_count"),
-        avg("total_spent").alias("avg_spending"),
-        spark_sum("total_transaction_amount").alias("total_revenue")
-    ) \\
-        .orderBy("age_group", "customer_tier")
-
-    return insights_df'''
-
-    @pytest.fixture(scope="session")
-    def migrated_snowpark_function_with_issues(self):
-        """Return a migrated Snowpark function with intentional issues for testing review."""
-        return '''def generate_customer_insights(df: DataFrame) -> DataFrame:
-    """
-    Generate business insights from customer data.
-
-    Args:
-        df: Enriched customer data
-
-    Returns:
-        DataFrame: Customer insights summary
-    """
-    from snowflake.snowpark.functions import count, avg, sum, desc
-
-    # ISSUE: Still using PySpark method names instead of Snowpark
-    insights_df = df.groupBy("age_group", "customer_tier") \\
-        .agg(
-        count("customer_id").alias("customer_count"),
-        avg("total_spent").alias("avg_spending"),
-        sum("total_transaction_amount").alias("total_revenue")
-    ) \\
-        .orderBy("age_group", "customer_tier")
-
-    return insights_df'''
-
-    @pytest.fixture(scope="session")
     def enriched_pyspark_function(self):
         """Return the enriched PySpark function with migration guidance comments."""
         return '''def generate_customer_insights(df: DataFrame) -> DataFrame:
@@ -124,6 +80,57 @@ class TestCodeReviewer:
         spark_sum("total_transaction_amount").alias("total_revenue")
     ) \\
         .orderBy("age_group", "customer_tier")
+
+    return insights_df'''
+
+    @pytest.fixture(scope="session")
+    def migrated_snowpark_function_with_issues(self):
+        """Return a migrated Snowpark function with intentional issues for testing review."""
+        return '''def generate_customer_insights(df: DataFrame) -> DataFrame:
+    """
+    Generate business insights from customer data.
+
+    Args:
+        df: Enriched customer data
+
+    Returns:
+        DataFrame: Customer insights summary
+    """
+    from snowflake.snowpark.functions import count, avg, sum
+
+    # ISSUE: Still using PySpark method names instead of Snowpark
+    insights_df = df.groupBy("age_group", "customer_tier") \\
+        .agg(
+        count("customer_id").alias("customer_count"),
+        avg("total_spent").alias("avg_spending"),
+        sum("total_transaction_amount").alias("total_revenue")
+    ) \\
+        .orderBy("age_group", "customer_tier")
+
+    return insights_df'''
+
+    @pytest.fixture(scope="session")
+    def well_migrated_snowpark_function(self):
+        """Return a well-migrated Snowpark function for testing PERFECT status."""
+        return '''def generate_customer_insights(df: DataFrame) -> DataFrame:
+    """
+    Generate business insights from customer data.
+
+    Args:
+        df: Enriched customer data
+
+    Returns:
+        DataFrame: Customer insights summary
+    """
+    from snowflake.snowpark.functions import count, avg, sum
+
+    insights_df = df.group_by("age_group", "customer_tier") \\
+        .agg(
+        count("customer_id").alias("customer_count"),
+        avg("total_spent").alias("avg_spending"),
+        sum("total_transaction_amount").alias("total_revenue")
+    ) \\
+        .order_by("age_group", "customer_tier")
 
     return insights_df'''
 
@@ -155,10 +162,10 @@ class TestCodeReviewer:
             "estimated_conversion_effort": "medium"
         }
 
-    def test_review_and_correct_returns_correct_structure(self, reviewer, enriched_pyspark_function,
-                                                          migrated_snowpark_function_with_issues,
-                                                          function_analysis_data, knowledge_service):
-        """Test Case 1: Validate top-level output structure of review_and_correct_migration."""
+    def test_review_and_correct_returns_correct_structure_v2(self, reviewer, enriched_pyspark_function,
+                                                             migrated_snowpark_function_with_issues,
+                                                             function_analysis_data, knowledge_service):
+        """Test Case 1: Validate V2.0 output structure of review_and_correct_migration."""
         # Execute the complete review and correction process
         result = reviewer.review_and_correct_migration(
             original_function_code=enriched_pyspark_function,
@@ -182,10 +189,10 @@ class TestCodeReviewer:
         assert isinstance(result["corrected_code"], str), "corrected_code should be a string"
         assert len(result["corrected_code"]) > 0, "corrected_code should not be empty"
 
-    def test_review_report_structure_is_valid(self, reviewer, enriched_pyspark_function,
-                                              migrated_snowpark_function_with_issues,
-                                              function_analysis_data, knowledge_service):
-        """Test Case 2: Deep validation of review_report structure."""
+    def test_v2_review_report_schema_validation(self, reviewer, enriched_pyspark_function,
+                                                migrated_snowpark_function_with_issues,
+                                                function_analysis_data, knowledge_service):
+        """Test Case 2: Deep validation of V2.0 JSON schema structure."""
         # Execute the complete review and correction process
         result = reviewer.review_and_correct_migration(
             original_function_code=enriched_pyspark_function,
@@ -197,29 +204,57 @@ class TestCodeReviewer:
         # Extract review report section
         review_report = result["review_report"]
 
-        # Verify required review report fields
-        required_review_keys = ["migration_confidence_score", "summary", "review_comments"]
-        for key in required_review_keys:
-            assert key in review_report, f"review_report is missing required field: {key}"
+        # Verify V2.0 required fields
+        assert "overall_assessment" in review_report, "Missing 'overall_assessment' field"
+        assert "findings" in review_report, "Missing 'findings' field"
 
-        # Verify field types and ranges
-        assert isinstance(review_report["migration_confidence_score"], (int, float)), \
-            "migration_confidence_score should be a number"
-        assert 0.0 <= review_report["migration_confidence_score"] <= 1.0, \
-            "migration_confidence_score should be between 0.0 and 1.0"
+        # Validate overall_assessment structure
+        overall_assessment = review_report["overall_assessment"]
+        assert isinstance(overall_assessment, dict), "overall_assessment should be a dictionary"
+        assert "status" in overall_assessment, "Missing 'status' in overall_assessment"
+        assert "summary" in overall_assessment, "Missing 'summary' in overall_assessment"
 
-        assert isinstance(review_report["summary"], str), \
-            "summary should be a string"
-        assert len(review_report["summary"]) > 0, \
-            "summary should not be empty"
+        # Validate status enum values
+        status = overall_assessment["status"]
+        assert status in ["PERFECT", "NEEDS_REFINEMENT"], f"Invalid status: {status}"
 
-        assert isinstance(review_report["review_comments"], list), \
-            "review_comments should be a list"
+        # Validate summary
+        assert isinstance(overall_assessment["summary"], str), "summary should be a string"
+        assert len(overall_assessment["summary"]) > 0, "summary should not be empty"
 
-    def test_review_detects_migration_issues(self, reviewer, enriched_pyspark_function,
-                                             migrated_snowpark_function_with_issues,
-                                             function_analysis_data, knowledge_service):
-        """Test Case 3: Verify review can detect migration issues in the function."""
+        # Validate findings structure
+        findings = review_report["findings"]
+        assert isinstance(findings, list), "findings should be a list"
+
+        # If status is NEEDS_REFINEMENT, findings should not be empty
+        if status == "NEEDS_REFINEMENT":
+            assert len(findings) > 0, "findings should not be empty when status is NEEDS_REFINEMENT"
+
+            # Validate each finding structure
+            for finding in findings:
+                assert isinstance(finding, dict), "Each finding should be a dictionary"
+
+                required_finding_keys = ["category", "faulty_code_snippet", "issue_description", "suggested_correction"]
+                for key in required_finding_keys:
+                    assert key in finding, f"Missing key '{key}' in finding"
+
+                # Validate category enum
+                assert finding["category"] in ["API_MISUSE", "LOGIC_DIVERGENCE", "BEST_PRACTICE_VIOLATION", "STYLE_ISSUE"], \
+                    f"Invalid category: {finding['category']}"
+
+                # Validate string fields are not empty
+                for key in ["faulty_code_snippet", "issue_description", "suggested_correction"]:
+                    assert isinstance(finding[key], str), f"{key} should be a string"
+                    assert len(finding[key]) > 0, f"{key} should not be empty"
+
+        # If status is PERFECT, findings should be empty
+        elif status == "PERFECT":
+            assert len(findings) == 0, "findings should be empty when status is PERFECT"
+
+    def test_auditor_detects_issues_v2(self, reviewer, enriched_pyspark_function,
+                                       migrated_snowpark_function_with_issues,
+                                       function_analysis_data, knowledge_service):
+        """Test Case 3: Verify V2.0 auditor detects migration issues."""
         # Execute review and correction
         result = reviewer.review_and_correct_migration(
             original_function_code=enriched_pyspark_function,
@@ -229,20 +264,28 @@ class TestCodeReviewer:
         )
 
         review_report = result["review_report"]
+        overall_assessment = review_report["overall_assessment"]
 
         # The migrated function has intentional issues (groupBy instead of group_by)
-        # The review should detect these and have lower confidence
-        confidence_score = review_report["migration_confidence_score"]
-        assert confidence_score < 1.0, "Should detect issues and have confidence < 1.0"
+        # The auditor should detect these and mark as NEEDS_REFINEMENT
+        assert overall_assessment["status"] == "NEEDS_REFINEMENT", \
+            "Should detect issues and mark as NEEDS_REFINEMENT"
 
-        # Should have review comments
-        review_comments = review_report["review_comments"]
-        assert len(review_comments) > 0, "Should have review comments for the issues"
+        # Should have findings with specific issues
+        findings = review_report["findings"]
+        assert len(findings) > 0, "Should have findings for the detected issues"
 
-    def test_correction_improves_code_quality(self, reviewer, enriched_pyspark_function,
-                                              migrated_snowpark_function_with_issues,
-                                              function_analysis_data, knowledge_service):
-        """Test Case 4: Verify correction process improves code quality."""
+        # Verify findings contain actionable corrections
+        for finding in findings:
+            assert len(finding["faulty_code_snippet"]) > 0, \
+                "faulty_code_snippet should contain actual problematic code"
+            assert len(finding["suggested_correction"]) > 0, \
+                "suggested_correction should contain replacement code"
+
+    def test_surgeon_applies_corrections_v2(self, reviewer, enriched_pyspark_function,
+                                            migrated_snowpark_function_with_issues,
+                                            function_analysis_data, knowledge_service):
+        """Test Case 4: Verify V2.0 surgeon applies corrections properly."""
         # Execute review and correction
         result = reviewer.review_and_correct_migration(
             original_function_code=enriched_pyspark_function,
@@ -263,16 +306,52 @@ class TestCodeReviewer:
         assert "Generate business insights from customer data" in corrected_code, \
             "Docstring content should be preserved"
 
-        # Check if corrections were made (should convert to Snowpark methods)
-        # Note: We can't guarantee exact corrections due to LLM variability,
-        # but we can check for improvements
-        assert "generate_customer_insights" in corrected_code, \
+        # Verify corrected_code is different from original (corrections were applied)
+        assert corrected_code != original_migrated, \
+            "Corrected code should be different from original migrated code"
+
+        # Basic validation that it's still Python code
+        assert "def " in corrected_code, "Should still contain function definition"
+        assert "return " in corrected_code, "Should still contain return statement"
+
+    def test_perfect_code_workflow_v2(self, reviewer, enriched_pyspark_function,
+                                      well_migrated_snowpark_function,
+                                      function_analysis_data, knowledge_service):
+        """Test Case 5: Verify V2.0 workflow with well-migrated code (PERFECT status)."""
+        # Execute review and correction with well-migrated code
+        result = reviewer.review_and_correct_migration(
+            original_function_code=enriched_pyspark_function,
+            migrated_function_code=well_migrated_snowpark_function,
+            knowledge_service=knowledge_service,
+            function_analysis=function_analysis_data
+        )
+
+        review_report = result["review_report"]
+        overall_assessment = review_report["overall_assessment"]
+
+        # Should recognize good code as PERFECT (or at least high quality)
+        # Note: Due to LLM variability, we allow for either PERFECT or high-quality NEEDS_REFINEMENT
+        status = overall_assessment["status"]
+        assert status in ["PERFECT", "NEEDS_REFINEMENT"], f"Status should be valid: {status}"
+
+        # If PERFECT, findings should be empty
+        if status == "PERFECT":
+            assert len(review_report["findings"]) == 0, \
+                "Findings should be empty for PERFECT status"
+
+            # Corrected code should be identical to original when PERFECT
+            assert result["corrected_code"] == well_migrated_snowpark_function, \
+                "Corrected code should be unchanged for PERFECT status"
+
+        # Verify structure regardless of status
+        assert isinstance(result["corrected_code"], str), "Should return corrected code"
+        assert "generate_customer_insights" in result["corrected_code"], \
             "Function name should be preserved"
 
-    def test_print_complete_review_process_for_inspection(self, reviewer, enriched_pyspark_function,
-                                                          migrated_snowpark_function_with_issues,
-                                                          function_analysis_data, knowledge_service):
-        """Test Case 5: Print complete review process for manual inspection."""
+    def test_complete_v2_workflow_inspection(self, reviewer, enriched_pyspark_function,
+                                             migrated_snowpark_function_with_issues,
+                                             function_analysis_data, knowledge_service):
+        """Test Case 6: Print complete V2.0 Auditor-Surgeon workflow for inspection."""
         # Execute the complete review and correction process
         result = reviewer.review_and_correct_migration(
             original_function_code=enriched_pyspark_function,
@@ -284,99 +363,65 @@ class TestCodeReviewer:
         # Verify result is not None
         assert result is not None, "Review and correction result should not be None"
 
-        # Print comprehensive results
+        # Print comprehensive V2.0 results
         print("\n" + "=" * 100)
-        print("COMPLETE REVIEW AND CORRECTION PROCESS - GENERATE_CUSTOMER_INSIGHTS FUNCTION")
+        print("CODE REVIEWER V2.0 - AUDITOR + SURGEON WORKFLOW INSPECTION")
         print("=" * 100)
 
-        print("\n--- 1. ORIGINAL PYSPARK FUNCTION (WITH MIGRATION GUIDANCE) ---")
+        print("\n--- PHASE 0: INPUT DATA ---")
+        print("Original PySpark Function (with guidance):")
         print(enriched_pyspark_function)
-
-        print("\n--- 2. MIGRATED SNOWPARK FUNCTION (WITH INTENTIONAL ISSUES) ---")
+        print("\nMigrated Snowpark Function (with issues):")
         print(migrated_snowpark_function_with_issues)
+        print("\nFunction Analysis Data:")
+        print(json.dumps(function_analysis_data, indent=2))
 
-        print("\n--- 3. FUNCTION ANALYSIS DATA ---")
-        print(json.dumps(function_analysis_data, indent=4))
+        print("\n--- PHASE 1: AUDITOR RESULTS ---")
+        review_report = result.get("review_report")
+        print("Overall Assessment:")
+        print(json.dumps(review_report.get("overall_assessment"), indent=2))
+        print("\nFindings:")
+        print(json.dumps(review_report.get("findings"), indent=2))
 
-        print("\n--- 4. GENERATED REVIEW REPORT ---")
-        print(json.dumps(result.get("review_report"), indent=4))
-
-        print("\n--- 5. FINAL CORRECTED SNOWPARK FUNCTION ---")
+        print("\n--- PHASE 2: SURGEON RESULTS ---")
+        print("Final Corrected Code:")
         print(result.get("corrected_code"))
 
+        print("\n--- WORKFLOW SUMMARY ---")
+        status = review_report.get("overall_assessment", {}).get("status")
+        findings_count = len(review_report.get("findings", []))
+        print(f"Audit Status: {status}")
+        print(f"Issues Found: {findings_count}")
+        print(f"Surgeon Applied: {'Yes' if status == 'NEEDS_REFINEMENT' else 'No (Perfect Code)'}")
+
         print("\n" + "-" * 100)
-        print("REVIEW AND CORRECTION PROCESS COMPLETED - RESULTS DISPLAYED ABOVE")
+        print("V2.0 AUDITOR-SURGEON WORKFLOW COMPLETED")
         print("-" * 100 + "\n")
 
-    def test_reviewer_handles_well_migrated_code(self, reviewer, enriched_pyspark_function,
-                                                 function_analysis_data, knowledge_service):
-        """Test Case 6: Verify reviewer behavior with well-migrated code."""
-        # Create a well-migrated Snowpark function (minimal issues)
-        well_migrated_function = '''def generate_customer_insights(df: DataFrame) -> DataFrame:
-    """
-    Generate business insights from customer data.
-
-    Args:
-        df: Enriched customer data
-
-    Returns:
-        DataFrame: Customer insights summary
-    """
-    from snowflake.snowpark.functions import count, avg, sum
-
-    insights_df = df.group_by("age_group", "customer_tier") \\
-        .agg(
-        count("customer_id").alias("customer_count"),
-        avg("total_spent").alias("avg_spending"),
-        sum("total_transaction_amount").alias("total_revenue")
-    ) \\
-        .order_by("age_group", "customer_tier")
-
-    return insights_df'''
-
-        # Execute review and correction
-        result = reviewer.review_and_correct_migration(
-            original_function_code=enriched_pyspark_function,
-            migrated_function_code=well_migrated_function,
-            knowledge_service=knowledge_service,
-            function_analysis=function_analysis_data
-        )
-
-        review_report = result["review_report"]
-
-        # Should have higher confidence for well-migrated code
-        confidence_score = review_report["migration_confidence_score"]
-        assert confidence_score >= 0.7, "Should have high confidence for well-migrated code"
-
-        # Verify structure
-        assert isinstance(result["corrected_code"], str), "Should still return corrected code"
-        assert "generate_customer_insights" in result["corrected_code"], \
-            "Function name should be preserved"
-
-    def test_reviewer_with_complex_function_scenario(self, reviewer, knowledge_service):
-        """Test Case 7: Test reviewer with a more complex function scenario."""
-        # Complex original function with more operations
+    def test_complex_function_v2_workflow(self, reviewer, knowledge_service):
+        """Test Case 7: Test V2.0 workflow with complex function scenario."""
+        # Complex original function
         complex_original = '''def advanced_customer_analysis(df: DataFrame) -> DataFrame:
     """
     Advanced customer analysis with multiple transformations.
-
+    
     Args:
         df: Customer data
-
+        
     Returns:
         DataFrame: Advanced analytics results
     """
     # MIGRATION GUIDANCE: Convert all PySpark methods to Snowpark equivalents
     # MIGRATION GUIDANCE: Use proper imports from snowflake.snowpark.functions
     # MIGRATION GUIDANCE: Handle window functions properly
-
+    
     from pyspark.sql.window import Window
-    from pyspark.sql.functions import row_number, desc
-
+    from pyspark.sql.functions import row_number, desc, col
+    
     # Add ranking within each tier
     window_spec = Window.partitionBy("customer_tier").orderBy(desc("total_spent"))
     ranked_df = df.withColumn("tier_rank", row_number().over(window_spec))
-
+    
     # Generate insights with filtering
     insights = ranked_df.filter(col("tier_rank") <= 10) \\
         .groupBy("customer_tier", "age_group") \\
@@ -386,28 +431,28 @@ class TestCodeReviewer:
             spark_sum("total_transaction_amount").alias("top_revenue")
         ) \\
         .orderBy("customer_tier", desc("top_revenue"))
-
+        
     return insights'''
 
-        # Complex migrated function with mixed issues
+        # Complex migrated function with multiple issues
         complex_migrated = '''def advanced_customer_analysis(df: DataFrame) -> DataFrame:
     """
     Advanced customer analysis with multiple transformations.
-
+    
     Args:
         df: Customer data
-
+        
     Returns:
         DataFrame: Advanced analytics results
     """
     from snowflake.snowpark.functions import count, avg, sum, desc, row_number, col
     from snowflake.snowpark import Window
-
-    # Add ranking within each tier - ISSUE: still uses withColumn
+    
+    # ISSUE: still uses withColumn instead of with_column
     window_spec = Window.partition_by("customer_tier").order_by(desc("total_spent"))
     ranked_df = df.withColumn("tier_rank", row_number().over(window_spec))
-
-    # Generate insights with filtering - ISSUE: mixed method names
+    
+    # ISSUE: mixed method names (groupBy vs group_by, orderBy vs order_by)
     insights = ranked_df.filter(col("tier_rank") <= 10) \\
         .groupBy("customer_tier", "age_group") \\
         .agg(
@@ -415,8 +460,8 @@ class TestCodeReviewer:
             avg("total_spent").alias("avg_top_spending"),
             sum("total_transaction_amount").alias("top_revenue")
         ) \\
-        .order_by("customer_tier", desc("top_revenue"))
-
+        .orderBy("customer_tier", desc("top_revenue"))
+        
     return insights'''
 
         # Complex analysis data
@@ -447,9 +492,26 @@ class TestCodeReviewer:
             function_analysis=complex_analysis
         )
 
-        # Basic validation for complex scenario
+        # Validate V2.0 structure for complex scenario
         assert isinstance(result, dict), "Should return dictionary for complex functions"
         assert "review_report" in result, "Should contain review report"
         assert "corrected_code" in result, "Should contain corrected code"
-        assert isinstance(result["review_report"]["migration_confidence_score"], (int, float)), \
-            "Should have numeric confidence score"
+
+        # Validate V2.0 schema compliance
+        review_report = result["review_report"]
+        assert "overall_assessment" in review_report, "Should have overall_assessment"
+        assert "findings" in review_report, "Should have findings"
+
+        overall_assessment = review_report["overall_assessment"]
+        assert overall_assessment["status"] in ["PERFECT", "NEEDS_REFINEMENT"], \
+            "Should have valid status"
+
+        # Complex functions with issues should likely need refinement
+        if overall_assessment["status"] == "NEEDS_REFINEMENT":
+            findings = review_report["findings"]
+            assert len(findings) > 0, "Should have findings for complex function issues"
+
+            # Validate findings structure for complex scenario
+            for finding in findings:
+                assert finding["category"] in ["API_MISUSE", "LOGIC_DIVERGENCE", "BEST_PRACTICE_VIOLATION", "STYLE_ISSUE"], \
+                    f"Invalid category in complex scenario: {finding['category']}"

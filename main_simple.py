@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 PySpark to Snowpark Migration Tool - Main Entry Point
-Version 2.0 - Per-Function Atomic Processing with Dual-Track Migration
+Version 2.1 - Per-Function Atomic Processing with Simplified Migration
 """
 
 import argparse
@@ -20,7 +20,6 @@ from services.knowledge_service import KnowledgeService
 from agents.code_analyzer import CodeAnalyzer
 from agents.code_enricher import CodeEnricher
 from agents.code_migrator import CodeMigrator
-from agents.code_reviewer import CodeReviewer
 
 
 def setup_logging():
@@ -129,9 +128,9 @@ def get_function_analysis(analysis_report, function_name):
 
 
 def process_single_function(function_name, script_content, analysis_report, output_dir,
-                            enricher, migrator, reviewer, knowledge_service, logger):
+                            enricher, migrator, knowledge_service, logger):
     """
-    Process a single function through the complete dual-track migration workflow
+    Process a single function through the simplified migration workflow
 
     Args:
         function_name (str): Name of the function to process
@@ -140,7 +139,6 @@ def process_single_function(function_name, script_content, analysis_report, outp
         output_dir (str): Base output directory
         enricher: CodeEnricher instance
         migrator: CodeMigrator instance
-        reviewer: CodeReviewer instance
         knowledge_service: KnowledgeService instance
         logger: Logger instance
     """
@@ -173,39 +171,17 @@ def process_single_function(function_name, script_content, analysis_report, outp
     # Track A: Process main business logic code
     logger.info(f"Starting Track A (main code) migration for: {function_name}")
 
-    # Migrate main code
+    # Migrate main code - final output
     migrated_code = migrator.migrate_function(enriched_code, function_analysis, knowledge_service)
-    save_artifact(migrated_code, os.path.join(function_output_dir, '03_migrated_code.py'))
-
-    # Review and correct main code
-    review_result = reviewer.review_and_correct_migration(
-        enriched_code, migrated_code, knowledge_service, function_analysis
-    )
-    review_report = review_result.get('review_report', {})
-    corrected_code = review_result.get('corrected_code', migrated_code)
-
-    # Save main code review artifacts
-    save_artifact(review_report, os.path.join(function_output_dir, '04_review_report_main.json'))
-    save_artifact(corrected_code, os.path.join(function_output_dir, '05_corrected_code_main.py'))
+    save_artifact(migrated_code, os.path.join(function_output_dir, '03_final_migrated_code.py'))
 
     # Track B: Process unit test code (if exists)
     if test_code:
         logger.info(f"Starting Track B (test code) migration for: {function_name}")
 
-        # Migrate test code
+        # Migrate test code - final output
         migrated_test = migrator.migrate_function(test_code, function_analysis, knowledge_service)
-        save_artifact(migrated_test, os.path.join(function_output_dir, '06_migrated_test.py'))
-
-        # Review and correct test code
-        test_review_result = reviewer.review_and_correct_migration(
-            test_code, migrated_test, knowledge_service, function_analysis
-        )
-        test_review_report = test_review_result.get('review_report', {})
-        corrected_test = test_review_result.get('corrected_code', migrated_test)
-
-        # Save test code review artifacts
-        save_artifact(test_review_report, os.path.join(function_output_dir, '07_review_report_test.json'))
-        save_artifact(corrected_test, os.path.join(function_output_dir, '08_corrected_code_test.py'))
+        save_artifact(migrated_test, os.path.join(function_output_dir, '04_final_migrated_test.py'))
     else:
         logger.info(f"No test code generated for function: {function_name}, skipping Track B")
 
@@ -217,7 +193,7 @@ def main():
     logger = setup_logging()
 
     try:
-        logger.info("=== PySpark to Snowpark Migration Tool Started (Version 2.0) ===")
+        logger.info("=== PySpark to Snowpark Migration Tool Started (Version 2.1) ===")
 
         # Phase 1: Global Preparation
         logger.info("=== Phase 1: Global Preparation ===")
@@ -243,12 +219,11 @@ def main():
         llm_service = CortexLLMService()
         knowledge_service = KnowledgeService(knowledge_base_path=knowledge_base_path)
 
-        # Instantiate agents with dependency injection
+        # Instantiate agents with dependency injection (removed reviewer)
         logger.info("Initializing agents...")
         analyzer = CodeAnalyzer(llm_service=llm_service)
         enricher = CodeEnricher(llm_service=llm_service)
         migrator = CodeMigrator(llm_service=llm_service)
-        reviewer = CodeReviewer(llm_service=llm_service)
 
         # Read source file
         logger.info("Reading source file...")
@@ -297,7 +272,6 @@ def main():
                     output_dir=output_dir,
                     enricher=enricher,
                     migrator=migrator,
-                    reviewer=reviewer,
                     knowledge_service=knowledge_service,
                     logger=logger
                 )

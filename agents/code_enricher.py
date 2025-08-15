@@ -103,7 +103,7 @@ class CodeEnricher:
 
 **1. Code Documentation:**
    - Add a detailed `docstring` that follows Google Python style guidelines, clearly describing the function's purpose, parameters (Args), and return values (Returns).
-   - Add concise and clear inline comments above key logic steps within the function body, explaining the "why" of the code.
+   - Add concise inline comments that reveal the business intent, performance considerations, or hidden assumptions behind the code. These comments should act as instructions for a subsequent AI agent that will migrate this code to another platform, highlighting anything that is not obvious from the code itself.
 
 **2. Unit Test Generation:**
    - Write a complete test function that can be directly run with `pytest`.
