@@ -10,7 +10,7 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.decomposition import PCA
-from sklearn.impute import SimpleImputer
+
 from sklearn.model_selection import train_test_split
 import warnings
 
@@ -88,10 +88,15 @@ def data_cleaning_preprocessing(df):
 
     df_processed = df.copy()
 
-    # Handle missing values for numeric columns
+    # Handle missing values for numeric columns using pandas methods
     numeric_cols = df_processed.select_dtypes(include=[np.number]).columns
-    numeric_imputer = SimpleImputer(strategy='median')
-    df_processed[numeric_cols] = numeric_imputer.fit_transform(df_processed[numeric_cols])
+
+    # Fill missing values with median
+    for col in numeric_cols:
+        if df_processed[col].isnull().any():
+            median_value = df_processed[col].median()
+            df_processed[col].fillna(median_value, inplace=True)
+            print(f"Filled missing values in {col} with median: {median_value:.2f}")
 
     # Handle outliers using IQR method for key columns
     outlier_cols = ['income', 'credit_score', 'purchase_amount']
@@ -232,7 +237,7 @@ def feature_selection_and_scaling(df, target_col='purchase_amount'):
     # Create a binary target for classification-based feature selection
     y_binary = (df[target_col] > df[target_col].median()).astype(int)
 
-    # Handle any remaining NaN values
+    # Handle any remaining NaN values using pandas
     X = X.fillna(X.median())
 
     print(f"Number of features before selection: {X.shape[1]}")
