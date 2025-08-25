@@ -97,23 +97,32 @@ class CodeEnricher:
         Returns:
             The complete prompt string ready for LLM processing
         """
-        prompt_template = """You are a top-tier PySpark development expert and technical documentation engineer. Your task is to process the single PySpark function provided below and simultaneously complete two tasks: 1. Write high-quality documentation for it. 2. Write a complete unit test for it.
+        prompt_template = """You are a senior Python developer with deep expertise in both PySpark and Pandas data manipulation libraries. Your task is to analyze the provided Python function, and then perform two tasks: 1. Write comprehensive documentation. 2. Generate a correct and runnable unit test.
 
 **Task Details:**
 
 **1. Code Documentation:**
-   - Add a detailed `docstring` that follows Google Python style guidelines, clearly describing the function's purpose, parameters (Args), and return values (Returns).
-   - Add concise inline comments that reveal the business intent, performance considerations, or hidden assumptions behind the code. These comments should act as instructions for a subsequent AI agent that will migrate this code to another platform, highlighting anything that is not obvious from the code itself.
+   - Add a detailed `docstring` following the Google Python style guide, explaining the function's purpose, arguments (Args), and return values (Returns).
+   - Add concise inline comments to guide a future AI migration agent. These comments should highlight critical logic, performance considerations (e.g., in-memory operations for Pandas, potential shuffles for PySpark), or non-obvious business rules.
 
 **2. Unit Test Generation:**
-   - Write a complete test function that can be directly run with `pytest`.
-   - The test function must include:
-     a. Create a local SparkSession for testing.
-     b. Generate realistic input data for testing (e.g., a PySpark DataFrame).
-     c. Define expected output data (e.g., another PySpark DataFrame) that should be the correct result after the input data is processed by the function.
-     d. Call the function under test with the input data.
-     e. Use assertions to strictly compare actual output with expected output to verify function correctness.
+   - You must first inspect the function's code to determine its primary library (PySpark, Pandas, or standard Python).
+   - Then, generate a complete `pytest` test function according to the matching rules below.
 
+   **Rule A: If the function uses PySpark:**
+   - The test must create a local SparkSession.
+   - Input and expected output data should be PySpark DataFrames.
+   - Assert the equality of the output DataFrame's content against the expected data.
+
+   **Rule B: If the function uses Pandas:**
+   - The test must `import pandas as pd`.
+   - Input and expected output data should be Pandas DataFrames.
+   - Use an appropriate method (e.g., `pd.testing.assert_frame_equal`) to assert DataFrame equality.
+   
+   **Rule C: If the function is standard Python:**
+   - Use standard Python data structures (e.g., lists of dicts) for input and expected output.
+   - Use standard pytest assertions to check the result.
+   
 **Function to Process:**
 ```python
 {function_code}

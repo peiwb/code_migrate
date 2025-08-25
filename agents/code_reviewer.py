@@ -141,9 +141,11 @@ class CodeReviewer:
         """Build comprehensive audit prompt for rigorous code review."""
         formatted_recipes = self._format_recipes(recipes)
 
-        return f"""You are a meticulous and detail-oriented Snowpark code auditor. Your sole task is to audit the "Migrated Snowpark Function" against the "Original PySpark Function" and "Reference Materials".
-
-Your audit must be rigorous and objective. For every issue you find, you MUST provide the exact faulty code snippet and a direct, ready-to-use code snippet for its correction.
+        return f"""You are a meticulous and detail-oriented Snowpark code auditor with expertise in migrations from both PySpark and Pandas. Your task is to rigorously audit the "Migrated Snowpark Function" against the "Original Source Function" and provide a structured JSON report with precise, actionable corrections.
+Critical Audit Protocol:
+1.Identify Source Dialect: First, examine the "Original Source Function" to determine if its primary dialect is PySpark or Pandas. This is essential for the next step.
+2.Select Correct Reference: Based on the identified dialect, you MUST use ONLY the corresponding set of reference materials for your audit (either PySpark-to-Snowpark or Pandas-to-Snowpark).
+3.Perform Audit: Conduct a thorough review based on the checklist below, using the original function as the source of truth for intent and the correct reference materials as the standard for correctness.
 
 ---[Reference Materials]---
 {formatted_recipes}
@@ -163,15 +165,15 @@ Your audit must be rigorous and objective. For every issue you find, you MUST pr
 
 **Audit Checklist & Instructions:**
 
-1. **API Usage**: Compare API calls (e.g., groupBy, orderBy) against the reference materials. Are they correct Snowpark equivalents?
+1. Correct API Translation: Does the migrated code use the correct Snowpark APIs as defined in the relevant reference materials?
 
-2. **Logical Equivalence**: Does the migrated code's logic fully match the intent described in the original function's docstrings and comments?
+2. Logical Equivalence: Does the Snowpark code's logic perfectly match the intent of the original PySpark/Pandas code? Pay close attention to nuances (e.g., Pandas' in-memory vs. Snowpark's lazy execution).
 
-3. **Best Practices**: Does the code adhere to Snowpark best practices? (e.g., using with_column_renamed instead of select+alias for simple renaming)
+3. Best Practice Adherence: Does the code follow Snowpark best practices? Are there more efficient ways to achieve the same result?
 
-4. **Documentation Preservation**: Are function signatures, docstrings, and inline comments completely preserved?
+4. Completeness: Are all functionalities from the original function present? Are docstrings and meaningful comments preserved?
 
-5. **TODO Flag Check**: Does it contain # TODO: [MANUAL MIGRATION REQUIRED] markers? If so, categorize as BEST_PRACTICE_VIOLATION.
+5. TODO Flag Check: Does the code contain # TODO: [MANUAL MIGRATION REQUIRED] markers? If so, this is a BEST_PRACTICE_VIOLATION.
 
 **Output Requirements:**
 Generate a JSON report based on the provided schema. For each finding, you MUST provide both faulty_code_snippet and suggested_correction. If the code is perfect, the findings array must be empty and the status must be PERFECT.

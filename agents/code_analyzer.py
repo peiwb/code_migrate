@@ -79,7 +79,9 @@ class CodeAnalyzer:
 
     def _analyze_packages(self, script_content: str) -> Dict[str, List[Dict[str, str]]]:
         """Execute Stage 1: Package Analysis."""
-        prompt = f"""You are a Python code analysis expert. Your task is to analyze the Python script provided below, identify all import statements, and categorize them.
+        prompt = f"""You are a Python code analysis expert. Your task is to analyze the Python script provided below, which may contain a mix of standard libraries, PySpark, Pandas, and other data science packages. Please identify all import statements and categorize them.
+
+Your goal is to create a complete inventory of the script's dependencies.
 
 Please return your analysis results in the specified JSON format without any additional explanations or comments.
 
@@ -154,6 +156,11 @@ Please return your analysis results in the specified JSON format without any add
             "type": "object",
             "properties": {
                 "function_name": {"type": "string", "description": "Function name"},
+                "function_dialect": {
+                    "type": "string",
+                    "enum": ["pyspark", "pandas", "python", "mixed"],
+                    "description": "The primary programming dialect identified in the function."
+                },
                 "dependencies": {
                     "type": "object",
                     "properties": {
@@ -173,16 +180,20 @@ Please return your analysis results in the specified JSON format without any add
                 "suggested_patterns": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Identified PySpark pattern IDs, e.g., pyspark.withColumn"
+                    "description": "Identified key library pattern IDs, e.g., 'pyspark.withColumn', 'pandas.apply'."
                 }
             },
             "required": ["function_name", "dependencies", "suggested_patterns"]
         }
 
         for function_code in function_blocks:
-            prompt = f"""You are a PySpark to Snowpark code migration expert. Your task is to perform deep analysis on the **single** PySpark function provided below.
+            prompt = f"""You are a Python Data Engineering and Migration Expert, specializing in migrating code from various sources like PySpark, Pandas, and pure Python to Snowpark.
 
-Please identify the function's dependencies and PySpark code patterns contained within.
+Your task is to perform a deep analysis on the **single** Python function provided below and extract three key pieces of information:
+
+1.  **Primary Dialect**: Identify and label the function's primary programming paradigm. Is it mainly using PySpark APIs, Pandas APIs, or is it pure Python logic?
+2.  **Dependencies**: List all internal functions it calls and external packages it uses (e.g., `pyspark.sql.functions`, `pandas`, `numpy`).
+3.  **Key Patterns**: Identify the most important code patterns or API calls that will be critical for migration (e.g., `pyspark.withColumn`, `pandas.apply`, `sklearn.fit`).
 
 Please strictly return your analysis results in the specified JSON format without any additional explanations.
 
