@@ -141,44 +141,58 @@ class CodeReviewer:
         """Build comprehensive audit prompt for rigorous code review."""
         formatted_recipes = self._format_recipes(recipes)
 
-        return f"""You are a meticulous and detail-oriented Snowpark code auditor with expertise in migrations from both PySpark and Pandas. Your task is to rigorously audit the "Migrated Snowpark Function" against the "Original Source Function" and provide a structured JSON report with precise, actionable corrections.
-Critical Audit Protocol:
-1.Identify Source Dialect: First, examine the "Original Source Function" to determine if its primary dialect is PySpark or Pandas. This is essential for the next step.
-2.Select Correct Reference: Based on the identified dialect, you MUST use ONLY the corresponding set of reference materials for your audit (either PySpark-to-Snowpark or Pandas-to-Snowpark).
-3.Perform Audit: Conduct a thorough review based on the checklist below, using the original function as the source of truth for intent and the correct reference materials as the standard for correctness.
+        return f"""You are a meticulous and detail-oriented Snowpark code auditor with expert-level knowledge in migrating data pipelines from both PySpark and Pandas. Your task is to rigorously audit the "Migrated Snowpark Function" against the "Original Source Function" and provide a structured JSON report with precise, actionable corrections.
+
+**Critical Audit Protocol:**
+
+1. **Identify Source Dialects**: First, examine the "Original Source Function" to identify all data manipulation dialects used: `pyspark`, `pandas`, or a `mix` of both. This is essential for a correct audit.
+2. **Select Relevant Reference(s)**: Based on the identified dialects, you MUST use the corresponding reference materials. For `mix`ed code, you are required to consult **both** sets of materials to audit different parts of the function.
+3. **Perform Comprehensive Audit**: Conduct a thorough review based on the checklist below. The original function is the source of truth for intent, and the reference materials are the standard for correctness.
+
+---
 
 ---[Reference Materials]---
+
 {formatted_recipes}
+
 ---[End of Reference Materials]---
 
----[Original PySpark Function (Source of Truth for Intent)]---
+
+
+---[Original Function (Source of Truth for Intent)]---
+
 ```python
+
 {original_code}
+
 ```
+
 ---[End of Original PySpark Function]---
 
----[Migrated Snowpark Function (Target for Audit)]---
+
+
+---[Migrated Function (Target for Audit)]---
+
 ```python
+
 {migrated_code}
+
 ```
----[End of Migrated Snowpark Function]---
 
-**Audit Checklist & Instructions:**
+---[End of Migrated Function]---
 
-1. Correct API Translation: Does the migrated code use the correct Snowpark APIs as defined in the relevant reference materials?
+---
 
-2. Logical Equivalence: Does the Snowpark code's logic perfectly match the intent of the original PySpark/Pandas code? Pay close attention to nuances (e.g., Pandas' in-memory vs. Snowpark's lazy execution).
+**Audit Checklist:**
 
-3. Best Practice Adherence: Does the code follow Snowpark best practices? Are there more efficient ways to achieve the same result?
+1. **Correct API Translation**: Does the migrated code use the correct Snowpark APIs as defined in the relevant reference materials for each dialect?
+2. **Logical Equivalence**: Does the Snowpark code's logic perfectly match the intent of the original source code?
+3. **Refactoring Quality (for Mixed Code)**: This is a critical check. For mixed-dialect functions, was the interaction point (e.g., `.toPandas()`) and subsequent Pandas logic successfully **refactored** into pure Snowpark code? The migration should eliminate Pandas, not just translate its functions.
+4. **Best Practice Adherence**: Does the code follow Snowpark best practices? Are there more efficient ways to achieve the same result?
+5. **Completeness**: Are all functionalities from the original function present? Are docstrings and meaningful comments preserved?
+6. **TODO Flag Check**: Does the code contain `# TODO: [MANUAL MIGRATION REQUIRED]` markers? If so, categorize this as a `BEST_PRACTICE_VIOLATION`.
 
-4. Completeness: Are all functionalities from the original function present? Are docstrings and meaningful comments preserved?
-
-5. TODO Flag Check: Does the code contain # TODO: [MANUAL MIGRATION REQUIRED] markers? If so, this is a BEST_PRACTICE_VIOLATION.
-
-**Output Requirements:**
-Generate a JSON report based on the provided schema. For each finding, you MUST provide both faulty_code_snippet and suggested_correction. If the code is perfect, the findings array must be empty and the status must be PERFECT.
-
-Your response must be valid JSON only, with no additional text or explanations."""
+**Output Requirements:** Generate a JSON report based on the provided schema. For each finding, you MUST provide both `faulty_code_snippet` and `suggested_correction`. If the code is perfect, the `findings` array must be empty and the `status` must be `PERFECT`. Your response must be valid JSON only."""
 
     # === Phase 2: Surgeon Implementation ===
 

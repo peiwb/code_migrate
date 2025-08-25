@@ -156,10 +156,13 @@ Please return your analysis results in the specified JSON format without any add
             "type": "object",
             "properties": {
                 "function_name": {"type": "string", "description": "Function name"},
-                "function_dialect": {
-                    "type": "string",
-                    "enum": ["pyspark", "pandas", "python", "mixed"],
-                    "description": "The primary programming dialect identified in the function."
+                "function_dialects": {
+                    "type": "array",
+                    "description": "A list of all data manipulation dialects found in the function.",
+                    "items": {
+                        "type": "string",
+                        "enum": ["pyspark", "pandas", "python"]
+                    }
                 },
                 "dependencies": {
                     "type": "object",
@@ -187,13 +190,13 @@ Please return your analysis results in the specified JSON format without any add
         }
 
         for function_code in function_blocks:
-            prompt = f"""You are a Python Data Engineering and Migration Expert, specializing in migrating code from various sources like PySpark, Pandas, and pure Python to Snowpark.
+            prompt = f"""You are an expert Python code analyst specializing in data engineering codebases. Your task is to perform a deep analysis on the **single** Python function provided below.
 
-Your task is to perform a deep analysis on the **single** Python function provided below and extract three key pieces of information:
+You must extract the following information:
 
-1.  **Primary Dialect**: Identify and label the function's primary programming paradigm. Is it mainly using PySpark APIs, Pandas APIs, or is it pure Python logic?
+1.  **Code Dialects**: Identify and list **all** major data manipulation dialects present in the function. A function can be a mix of multiple dialects. The possible dialects are `pyspark`, `pandas`, and `python`.
 2.  **Dependencies**: List all internal functions it calls and external packages it uses (e.g., `pyspark.sql.functions`, `pandas`, `numpy`).
-3.  **Key Patterns**: Identify the most important code patterns or API calls that will be critical for migration (e.g., `pyspark.withColumn`, `pandas.apply`, `sklearn.fit`).
+3.  **Key Patterns**: Identify the most important code patterns or API calls that will be critical for migration. For mixed-dialect functions, you MUST identify the patterns where the dialects interact (e.g., a `toPandas()` call).
 
 Please strictly return your analysis results in the specified JSON format without any additional explanations.
 

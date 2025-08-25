@@ -190,34 +190,48 @@ class CodeMigrator:
         """Build the complete migration prompt for the LLM."""
         formatted_recipes = self._format_recipes(recipes)
 
-        return f"""You are an expert software engineer specializing in migrating Python data processing code from libraries like Pandas and PySpark to Snowpark. Your task is to perform a precise and functionally equivalent migration.
+        return f"""You are a senior data engineer and architect specializing in refactoring complex Python data pipelines (from Pandas and PySpark) into pure, high-performance Snowpark code.
 
 **Critical Task Briefing:**
-1.  **Analyze Source**: First, analyze the source function to determine if it primarily uses Pandas or PySpark.
-2.  **Select Knowledge**: Based on your analysis, you MUST use the corresponding set of reference examples provided below.
-3.  **Follow Guidance**: The function contains CRITICAL inline comments added by a previous analysis step. These comments provide essential context about the source library's patterns (e.g., Pandas-specific issues like `.apply` or PySpark-specific issues like UDFs) and are your most important guide.
-4.  **Migrate**: Translate the function to Snowpark, following all rules.
+
+1. **Analyze Source Dialects**: First, examine the function to identify all data manipulation dialects used: `pyspark`, `pandas`, or a `mix` of both.
+2. **Select Relevant Knowledge**: Use the reference materials that match the dialects you identified. For `mix`ed code, you must consult **both** sets of examples.
+3. **Prioritize Refactoring over Translation (for Mixed Code)**: If the function is a `mix`, your main goal is to **refactor and eliminate the Pandas logic**. Do not simply find a Snowpark equivalent for `.toPandas()`. Instead, analyze the subsequent Pandas operations and rewrite that entire logical block using native Snowpark DataFrame APIs. This is the most critical instruction.
+4. **Follow Inline Guidance**: The function contains crucial inline comments from a previous step (e.g., warnings about `.toPandas()`). Use them to understand the code's intent and risks.
+5. **Generate Pure Snowpark Code**: Translate the function following all rules.
+
+---
 
 ---[REFERENCE EXAMPLES]---
+
 {formatted_recipes}
+
 ---[END REFERENCE EXAMPLES]---
 
+
+
 ---[FUNCTION TO MIGRATE]---
+
 ```python
+
 {function_code}
+
 ```
+
 ---[END FUNCTION]---
 
-MIGRATION RULES:
-1. Preserve original function signature (name and parameters)
-2. Follow ALL inline migration guidance comments. These are not optional.
-3. After applying the guidance from a comment, remove the guidance comment itself from the final code. Keep the original docstring.
-4. Translate source library APIs (Pandas, PySpark) to their Snowpark equivalents using the correct set of reference examples.
-5. Pure Python logic (loops, conditions, variable assignments) should be maintained.
-6. If you encounter an API or pattern that you cannot confidently migrate, insert a comment: # TODO: [MANUAL MIGRATION REQUIRED] - Reason: brief explanation.
-7. Your output MUST ONLY be the final, migrated Python code for the function. Do not include any explanations or markdown formatting.
+---
 
-Begin migration now."""
+**MIGRATION RULES:**
+
+1. **Preserve Signature**: The original function signature (name and parameters) must be preserved.
+2. **Follow Guidance**: You must follow all inline migration guidance comments. After applying the guidance, remove the comment. Keep the original docstring.
+3. **Refactor Mixed Code**: For mixed code, the final output should be pure Snowpark, eliminating the need for Pandas and avoiding data movement out of the distributed environment.
+4. **Translate Pure Code**: For pure PySpark or pure Pandas functions, translate the APIs to their Snowpark equivalents using the correct set of reference examples.
+5. **Handle Unknowns**: If you cannot confidently migrate a pattern, insert a comment: `# TODO: [MANUAL MIGRATION REQUIRED] - Reason: brief explanation.`
+6. **Output Format**: Your output MUST ONLY be the final, migrated Python code. Do not include any explanations or markdown formatting.
+
+**Begin migration.**"""
 
     def _format_recipes(self, recipes: list) -> str:
         """Format recipes into readable text blocks for the prompt."""

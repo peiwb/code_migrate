@@ -102,33 +102,40 @@ class CodeEnricher:
 **Task Details:**
 
 **1. Code Documentation:**
-   - Add a detailed `docstring` following the Google Python style guide, explaining the function's purpose, arguments (Args), and return values (Returns).
-   - Add concise inline comments to guide a future AI migration agent. These comments should highlight critical logic, performance considerations (e.g., in-memory operations for Pandas, potential shuffles for PySpark), or non-obvious business rules.
+- Add a detailed `docstring` following the Google Python style guide, explaining the function's purpose, arguments (Args), and return values (Returns).
+- Add concise inline comments to guide a future AI migration agent.
+- **For mixed-dialect functions, it is CRITICAL that you add inline comments at the points of interaction (e.g., `.toPandas()` or `spark.createDataFrame(pandas_df)`), explaining the performance implications of moving data between distributed and in-memory contexts.**
 
 **2. Unit Test Generation:**
-   - You must first inspect the function's code to determine its primary library (PySpark, Pandas, or standard Python).
-   - Then, generate a complete `pytest` test function according to the matching rules below.
+- You must first inspect the function's code to determine which libraries are used (PySpark, Pandas, standard Python, or a mix).
+- Then, generate a complete `pytest` test function according to the most appropriate rule below.
 
-   **Rule A: If the function uses PySpark:**
-   - The test must create a local SparkSession.
-   - Input and expected output data should be PySpark DataFrames.
-   - Assert the equality of the output DataFrame's content against the expected data.
+**Rule A: If the function uses ONLY PySpark:**
+- The test must create a local SparkSession.
+- Input and expected output data should be PySpark DataFrames.
+- Assert the equality of the output DataFrame's content against the expected data.
 
-   **Rule B: If the function uses Pandas:**
-   - The test must `import pandas as pd`.
-   - Input and expected output data should be Pandas DataFrames.
-   - Use an appropriate method (e.g., `pd.testing.assert_frame_equal`) to assert DataFrame equality.
-   
-   **Rule C: If the function is standard Python:**
-   - Use standard Python data structures (e.g., lists of dicts) for input and expected output.
-   - Use standard pytest assertions to check the result.
-   
+**Rule B: If the function uses ONLY Pandas:**
+- The test must `import pandas as pd`.
+- Input and expected output data should be Pandas DataFrames.
+- Use an appropriate method (e.g., `pd.testing.assert_frame_equal`) to assert DataFrame equality.
+
+**Rule C: If the function is ONLY standard Python:**
+- Use standard Python data structures (e.g., lists of dicts) for input and expected output.
+- Use standard pytest assertions to check the result.
+
+**Rule D: If the function uses a MIX of PySpark and Pandas:**
+- The test must be an **integration test** that validates the end-to-end logic.
+- It must create a local SparkSession.
+- It should create the initial input data in the format required by the function's signature.
+- It must assert the final output, which is typically a Spark DataFrame, against the expected data.
+
 **Function to Process:**
+
 ```python
 {function_code}
 ```
 
-Output Format:
-Your final output must be and can only be a well-formatted JSON object without any additional explanations. The JSON object must contain two keys: "enriched_code" and "test_function"."""
-
+**Output Format:** Your final output must be a single, well-formatted JSON object. The JSON object must contain two keys: "enriched_code" and "test_function", and nothing else.
+"""
         return prompt_template.format(function_code=function_code)
