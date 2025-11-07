@@ -10,7 +10,30 @@ print("Initializing SageMaker session...")
 sagemaker_session = sagemaker.Session()
 region = sagemaker_session.boto_region_name
 role = sagemaker.get_execution_role()  # Your IAM role
-bucket = sagemaker_session.default_bucket()
+# Create a unique bucket name
+account_id = boto3.client('sts').get_caller_identity()['Account']
+region = boto3.Session().region_name
+bucket_name = f"sagemaker-pipeline-{region}-{account_id}"
+
+print(f"Using bucket: {bucket_name}")
+
+# Create the bucket if it doesn't exist
+s3_client = boto3.client('s3')
+try:
+    if region == 'us-east-1':
+        s3_client.create_bucket(Bucket=bucket_name)
+    else:
+        s3_client.create_bucket(
+            Bucket=bucket_name,
+            CreateBucketConfiguration={'LocationConstraint': region}
+        )
+    print(f"✓ Created bucket: {bucket_name}")
+except s3_client.exceptions.BucketAlreadyOwnedByYou:
+    print(f"✓ Bucket already exists: {bucket_name}")
+except Exception as e:
+    print(f"Note: {e}")
+
+bucket = bucket_name
 
 print(f"✓ Using S3 bucket: {bucket}")
 print(f"✓ Using IAM role: {role}")
